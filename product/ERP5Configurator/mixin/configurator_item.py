@@ -28,11 +28,24 @@
 #
 ##############################################################################
 
+from Products.ERP5Type.ConsistencyMessage import ConsistencyMessage
+from Products.ERP5Type.Base import Base
 from zLOG import LOG, INFO
 import time
 
 class ConfiguratorItemMixin:
   """ This is the base class for all configurator item. """
+
+  def getBusinessConfigurationValue(self):
+    item = self
+    while item.getPortalType() != 'Business Configuration':
+      item = item.getParentValue()
+    return item
+
+  def _createConstraintMessage(self, message):
+    return ConsistencyMessage(self,
+        object_relative_url=self.getRelativeUrl(),
+        message=message)
 
   def install(self, document, business_configuration, prefix=''):
     """ Add object to customer customization template. """
