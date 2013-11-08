@@ -50,55 +50,51 @@
         </item>
         <item>
             <key> <string>_body</string> </key>
-            <value> <string>"""\n
-  Place for add Security or Roles upgrade.\n
-\n
-  There is tools and new modules added by upgrader\n
-  and those the roles should be updated. \n
-  \n
-  ie.: Make Web site available for old instances or\n
-  update local roles.\n
-  \n
+            <value> <string encoding="cdata"><![CDATA[
+
 """\n
-message_list = []\n
-\n
-# Currently is never needed to update security, it is always forced.\n
-if not upgrade:\n
-  return message_list\n
-\n
+  Run upgrader\n
+"""\n
 portal = context.getPortalObject()\n
-portal_workflow = portal.portal_workflow\n
-workflow_id_list = portal.ERP5Site_getUpgraderSignature().get(\'update_security_workflow_id_list\', [])\n
-for workflow_id in workflow_id_list:\n
-  workflow = getattr(portal_workflow, workflow_id, None)\n
-  if workflow is not None:\n
-    workflow.updateRoleMappings()\n
+portal_alarms = portal.portal_alarms\n
 \n
-message_list.append(\n
-            "Update workflow security for: \\n\\t%s" % \\\n
-            (\'\\n\\t\'.join(workflow_id_list)))\n
+def launchSenseAlarm(alarm_id, after_tag=[]):\n
+  """ Get the alarm and use sense"""\n
+  upgrader_alarm = getattr(portal_alarms, alarm_id, None)\n
+  if upgrader_alarm is not None:\n
+    # call solve method\n
+    kw = dict(tag=alarm_id)\n
+    if len(after_tag) > 0:\n
+      kw["after_tag"] = after_tag\n
+    method_id = upgrader_alarm.getActiveSenseMethodId()\n
+    if method_id not in (None, \'\'):\n
+      method = getattr(upgrader_alarm.activate(**kw), method_id)\n
+      method()\n
+    return [alarm_id,]\n
+  return after_tag\n
 \n
-types_tool = portal.portal_types\n
-portal_type_list = portal.ERP5Site_getUpgraderSignature().get(\'update_role_portal_type_list\', [])\n
+previous_tag = launchSenseAlarm(\'upgrader_check_pre_upgrade\')\n
 \n
-for pt in portal_type_list:\n
-  # Note: Raises on purpose\n
-  types_tool[pt].updateRoleMapping()\n
+previous_tag = launchSenseAlarm(\'upgrader_check_upgrader\',\n
+                                   after_tag=previous_tag)\n
 \n
-message_list.append(\n
-            "Update Local Roles for security groups for: \\n\\t%s" % \\\n
-            (\'\\n\\t\'.join(portal_type_list)))\n
+previous_tag = launchSenseAlarm(\'upgrader_check_post_upgrade\',\n
+                 after_tag=previous_tag)\n
 \n
-return message_list\n
-</string> </value>
+active_process = context.newActiveProcess()\n
+context.activate(after_tag=previous_tag).Alarm_postFullUpgradeNeed(\n
+  active_process=active_process.getRelativeUrl())\n
+
+
+]]></string> </value>
         </item>
         <item>
             <key> <string>_params</string> </key>
-            <value> <string>upgrade=0</string> </value>
+            <value> <string>REQUEST=None, **kw</string> </value>
         </item>
         <item>
             <key> <string>id</string> </key>
-            <value> <string>ERP5Site_upgradeSecurity</string> </value>
+            <value> <string>Alarm_senseFullUpgradeNeed</string> </value>
         </item>
       </dictionary>
     </pickle>

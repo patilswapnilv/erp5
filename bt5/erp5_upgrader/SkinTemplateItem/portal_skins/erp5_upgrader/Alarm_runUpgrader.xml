@@ -51,53 +51,26 @@
         <item>
             <key> <string>_body</string> </key>
             <value> <string>"""\n
-  Finalize Upgrade is the final step of upgrader. Here should contains\n
-  the scripts that should be executed after the business template installation.\n
+  Run Upgrader\n
 """\n
-# Setup skins\n
-context.ERP5Site_setupUpgraderSkinSelection()\n
-\n
-clear_cache_kw = dict(activity=\'SQLQueue\', \n
-                      priority=3, \n
-                      tag="tag_upgrader_clear_cache")\n
-\n
 portal_alarms = context.getPortalObject().portal_alarms\n
-activate = context.portal_activities.activate\n
-# Group Messages into the same active process.\n
-active_process = portal_alarms.upgrader_controller.getLastActiveProcess()\n
-if active_process is None:\n
-  active_process = context.newActiveProcess()\n
+active_process = context.newActiveProcess()\n
 \n
-active_process = active_process.getPath()\n
+# We should not run upgrader if pre upgrade was not solved or never executed \n
+alarm = getattr(portal_alarms, \'upgrader_check_pre_upgrade\')\n
+if alarm.sense() in (None, True):\n
+  active_process.postActiveResult(summary=context.getTitle(),\n
+      severity=1,\n
+      detail="Is required solve Pre Upgrade first. " +\\\n
+        "You need run active sense once at least on this alarm")\n
+  return\n
 \n
-message_list = []\n
-bt5_upgrader_sense = portal_alarms.bt5_upgrader.sense()\n
-if bt5_upgrader_sense:\n
-  activate(active_process=active_process,\n
-           activity=\'SQLQueue\',\n
-           priority=2).Alarm_saveActiveResult(\n
-              summary="ERROR: Finalize Upgrader not started",\n
-              severity=0,\n
-              detail=\'BT5 Upgrader Sense: %s\' % (bt5_upgrader_sense))\n
+context.Alarm_checkUpgraderConsistency(fixit=True,\n
+  active_process=active_process,\n
+  filter_dict={"constraint_type": ["upgrader",]})\n
 \n
-for script_id in context.ERP5Site_getUpgraderSignature().get(\'finalize_upgrade_script_list\', []):\n
-  message_list.extend(getattr(context, script_id)(upgrade=1))\n
-\n
-activate(active_process=active_process,\n
-           activity=\'SQLQueue\',\n
-           priority=2).Alarm_saveActiveResult(summary="Finalize Upgrade",\n
-                       severity=0,\n
-                       detail=\'\\n\'.join(message_list))\n
-\n
-clear_cache_kw[\'after_method_id\'] = [\'Alarm_saveActiveResult\',\'immediateReindexObject\']\n
-context.portal_caches.activate(**clear_cache_kw).clearAllCache()\n
-\n
-activate(active_process=active_process,\n
-           activity=\'SQLQueue\',\n
-           priority=4,\n
-           after_tag=clear_cache_kw[\'tag\']).ERP5Site_notifyUpgradeIntegrity(active_process=active_process)\n
-\n
-return message_list\n
+context.setEnabled(False)\n
+return\n
 </string> </value>
         </item>
         <item>
@@ -106,7 +79,7 @@ return message_list\n
         </item>
         <item>
             <key> <string>id</string> </key>
-            <value> <string>Alarm_upgradeFinalize</string> </value>
+            <value> <string>Alarm_runUpgrader</string> </value>
         </item>
       </dictionary>
     </pickle>

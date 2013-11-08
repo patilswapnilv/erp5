@@ -7,6 +7,10 @@
     <pickle>
       <dictionary>
         <item>
+            <key> <string>active_sense_method_id</string> </key>
+            <value> <string>Alarm_senseUpgradeNeed</string> </value>
+        </item>
+        <item>
             <key> <string>alarm_notification_mode</string> </key>
             <value>
               <tuple>
@@ -16,7 +20,7 @@
         </item>
         <item>
             <key> <string>description</string> </key>
-            <value> <string>This business template finalize the upgrade, this should contains the last steps of upgrade system (ie.: Clear Cache).</string> </value>
+            <value> <string>This step will run all constraints that have contraint_type equal upgrader.</string> </value>
         </item>
         <item>
             <key> <string>enabled</string> </key>
@@ -24,7 +28,7 @@
         </item>
         <item>
             <key> <string>id</string> </key>
-            <value> <string>finalize_upgrader</string> </value>
+            <value> <string>upgrader_check_upgrader</string> </value>
         </item>
         <item>
             <key> <string>periodicity_hour</string> </key>
@@ -68,7 +72,7 @@
                 </tuple>
                 <state>
                   <tuple>
-                    <float>1136073600.0</float>
+                    <float>1384423200.0</float>
                     <string>GMT</string>
                   </tuple>
                 </state>
@@ -87,15 +91,17 @@
         </item>
         <item>
             <key> <string>sense_method_id</string> </key>
-            <value> <string>Alarm_senseFinalizeUpgrade</string> </value>
+            <value>
+              <none/>
+            </value>
         </item>
         <item>
             <key> <string>solve_method_id</string> </key>
-            <value> <string>Alarm_upgradeFinalize</string> </value>
+            <value> <string>Alarm_runUpgrader</string> </value>
         </item>
         <item>
             <key> <string>title</string> </key>
-            <value> <string>Finalize Upgrader</string> </value>
+            <value> <string>Run Upgrader</string> </value>
         </item>
       </dictionary>
     </pickle>

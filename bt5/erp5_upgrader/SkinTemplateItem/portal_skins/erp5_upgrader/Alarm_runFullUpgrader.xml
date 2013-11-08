@@ -50,62 +50,55 @@
         </item>
         <item>
             <key> <string>_body</string> </key>
-            <value> <string>"""\n
- It is expected that some objects has some state in the after upgrade finish.\n
- This alarm verify and upgrade the objects that were defined in signature.\n
+            <value> <string encoding="cdata"><![CDATA[
+
 """\n
-from Products.ERP5Type.Log import log\n
-portal_templates = context.portal_templates\n
-validation_dict = context.ERP5Site_getUpgraderSignature().get(\'object_action_dict\', {})\n
-param_not_provided = "PARAM_NOT_PROVIDED"\n
+  Run upgrader\n
+"""\n
+portal = context.getPortalObject()\n
+portal_alarms = portal.portal_alarms\n
 \n
-# get list of title of bt5 that are installed.\n
-installed_bt5_title_list = [t.getTitle() for t in portal_templates.getInstalledBusinessTemplateList()]\n
+def launchUpgraderAlarm(alarm_id, after_method_id=[]):\n
+  """ Get the alarm and use sense and solve """\n
+  upgrader_alarm = getattr(portal_alarms, alarm_id, None)\n
+  if upgrader_alarm is not None and upgrader_alarm.sense():\n
+    # call solve method\n
+    kw = dict(tag=alarm_id)\n
+    if len(after_method_id) > 0:\n
+      kw["after_method_id"] = after_method_id\n
+    method_id = upgrader_alarm.getSolveMethodId()\n
+    if method_id not in (None, \'\'):\n
+      method = getattr(upgrader_alarm.activate(**kw), method_id)\n
+      method()\n
+    return [method_id] + after_method_id\n
+  return after_method_id\n
 \n
-# get the list of keys that correspond to a valid business template.\n
-upgradable_list = []\n
-for k in validation_dict.keys():\n
-  if k in installed_bt5_title_list:\n
-    upgradable_list.extend(validation_dict[k])\n
+previous_method_id = launchUpgraderAlarm(\'upgrader_check_pre_upgrade\')\n
 \n
-message_list = []\n
-for definition in upgradable_list:\n
-  if len(definition) == 5:\n
-    path, method_id, expected_state, action, param_list = definition\n
-  else:\n
-    path, method_id, expected_state, action = definition\n
-    param_list = param_not_provided\n
-  sub_message_list = []\n
-  try:\n
-    obj = context.restrictedTraverse(path)\n
-  except KeyError:\n
-    obj = None\n
-    log("Unable to find %s" % path)\n
-  if obj is not None:\n
-    method = getattr(obj, method_id, None)\n
-    if method is not None and method() == expected_state:\n
-      sub_message_list.append("Upgrade is required for Object List (%s object is in %s state, action %s.)" %\n
-                (path, expected_state, action))\n
-      if int(upgrade) == 1:\n
-        action_method = getattr(obj, action , None)\n
-        if action_method is not None:\n
-          if param_list == param_not_provided:\n
-            action_method()\n
-          else:\n
-            action_method(*param_list)\n
-          sub_message_list.append("[UPDATED]")\n
-      message_list.append(\' \'.join(sub_message_list))\n
-    \n
-return message_list\n
-</string> </value>
+previous_method_id.extend([\'recursiveImmediateReindexObject\',\n
+                           \'immediateReindexObject\'])\n
+\n
+previous_method_id = launchUpgraderAlarm(\'upgrader_check_upgrader\',\n
+                                   after_method_id=previous_method_id)\n
+\n
+previous_method_id.append(\'updateBusinessTemplateFromUrl\')\n
+previous_method_id = launchUpgraderAlarm(\'upgrader_check_post_upgrade\',\n
+                                   after_method_id=previous_method_id)\n
+\n
+# Nothing else to do, so we can disable.\n
+context.setEnabled(False)\n
+return\n
+
+
+]]></string> </value>
         </item>
         <item>
             <key> <string>_params</string> </key>
-            <value> <string>upgrade=0</string> </value>
+            <value> <string>**kw</string> </value>
         </item>
         <item>
             <key> <string>id</string> </key>
-            <value> <string>ERP5Site_upgradeObjectList</string> </value>
+            <value> <string>Alarm_runFullUpgrader</string> </value>
         </item>
       </dictionary>
     </pickle>

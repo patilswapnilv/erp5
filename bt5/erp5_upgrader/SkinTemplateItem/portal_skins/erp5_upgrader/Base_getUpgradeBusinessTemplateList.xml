@@ -51,47 +51,22 @@
         <item>
             <key> <string>_body</string> </key>
             <value> <string>"""\n
-  This script explains how to upgrade bt5. This script only update\n
-  the business templates, nothing else. Any other post script should\n
-  be handle by finalize upgrader.\n
+  This script should returns always two list of Business Template.\n
+   - The first list is to resolve dependencies and upgrade.\n
+   - The second list is what you want to keep. This is useful if we want to keep \n
+   a old business template without updating it and without removing it\n
 """\n
-# Setup skins\n
-context.ERP5Site_setupUpgraderSkinSelection()\n
 \n
-alarm_dict = context.ERP5Site_getUpgraderSignature().get(\'alarm_dict\', {})\n
-if not alarm_dict.get(context.getId(), True):\n
-  return False\n
-\n
-portal_alarms = context.getPortalObject().portal_alarms\n
-activate = context.portal_activities.activate\n
-# Group Messages into the same active process.\n
-active_process = portal_alarms.upgrader_controller.getLastActiveProcess()\n
-if active_process is None:\n
-  active_process = context.newActiveProcess()\n
-\n
-active_process = active_process.getPath()\n
-\n
-message_list = []\n
-\n
-# update existing bt5\n
-message_list.extend(context.ERP5Site_upgradeBusinessTemplateList(upgrade=1))\n
-\n
-activate(active_process=active_process,\n
-           activity=\'SQLQueue\',\n
-           priority=2).Alarm_saveActiveResult(summary="Upgrade BT5 Version",\n
-                       severity=0,\n
-                       detail=\'\\n\'.join(message_list))\n
-\n
-return message_list\n
+return (\'erp5_base\',), []\n
 </string> </value>
         </item>
         <item>
             <key> <string>_params</string> </key>
-            <value> <string>**kw</string> </value>
+            <value> <string>fixit=False</string> </value>
         </item>
         <item>
             <key> <string>id</string> </key>
-            <value> <string>Alarm_upgradeBT5Version</string> </value>
+            <value> <string>Base_getUpgradeBusinessTemplateList</string> </value>
         </item>
       </dictionary>
     </pickle>

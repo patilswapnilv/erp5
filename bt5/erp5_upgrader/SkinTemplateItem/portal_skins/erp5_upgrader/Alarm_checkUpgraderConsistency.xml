@@ -51,32 +51,64 @@
         <item>
             <key> <string>_body</string> </key>
             <value> <string>portal = context.getPortalObject()\n
-message_list = []\n
-is_upgrade_required = 0\n
-site_property_dict = portal.ERP5Site_getUpgraderSignature().get(\'erp5_site_property_dict\', {})\n
+constraint_type_list = portal.getPortalConstraintTypeList()\n
 \n
-for prop in site_property_dict:\n
-  if site_property_dict[prop] != getattr(portal,prop , None):\n
-    if not upgrade:\n
-      return ["Upgrade Required for Global Properties."]\n
-    is_upgrade_required = 1\n
-    break\n
+def getConstraintTypeListPerPortalType():\n
+  property_sheet_by_type_dict = {}\n
+  for portal_type in portal.portal_types.objectValues():\n
+    property_sheet_list = portal_type.getTypePropertySheetList()\n
+    if not property_sheet_list:\n
+      continue\n
+    for property_sheet in property_sheet_list:\n
+      property_sheet_by_type_dict.setdefault(\n
+        property_sheet, []).append(portal_type.getId())\n
 \n
-if is_upgrade_required:\n
-  for prop in site_property_dict:\n
-    portal.ERP5Site_editERP5SiteProperty(prop, site_property_dict[prop])\n
-    message_list.append("Upgrade Executed for Global Properties (%s)." % prop)\n
+  constraint_type_per_id = {}\n
+  for property_sheet in portal.portal_property_sheets.objectValues():\n
+    constraint_list = property_sheet.objectValues(\n
+      portal_type=constraint_type_list)\n
+    if not constraint_list:\n
+      continue\n
+    type_list = []\n
+    type_list_append = type_list.append\n
+    for constraint in constraint_list:\n
+      method = getattr(constraint, \'getConstraintType\', None)\n
+      if not method:\n
+        continue\n
+      constraint_type = method()\n
+      if constraint_type:\n
+        type_list_append(constraint_type)\n
+    if type_list:\n
+      property_sheet_id = property_sheet.getId()\n
+      constraint_type_per_id.setdefault(property_sheet_id, []).extend(type_list)\n
 \n
-return message_list\n
+  constraint_type_per_type = {}\n
+  for property_sheet_id, category_list in constraint_type_per_id.iteritems():\n
+    for portal_type in property_sheet_by_type_dict.get(property_sheet_id, []):\n
+      constraint_type_per_type.setdefault(portal_type, []).extend(category_list)\n
+  return constraint_type_per_type\n
+\n
+constraint_type_per_type = getConstraintTypeListPerPortalType()\n
+constraint_type = filter_dict.get("constraint_type")\n
+\n
+for portal_type, constraint_type_list in constraint_type_per_type.iteritems():\n
+  if not constraint_type and constraint_type not in constraint_type_list:\n
+    continue\n
+  method_kw = {\'fixit\': fixit,\n
+               \'filter\': filter_dict,\n
+               \'active_process\': active_process.getRelativeUrl()}\n
+  portal.portal_catalog.searchAndActivate(\'Base_postCheckConsistencyResult\',\n
+    portal_type=portal_type,\n
+    method_kw=method_kw)\n
 </string> </value>
         </item>
         <item>
             <key> <string>_params</string> </key>
-            <value> <string>upgrade=0</string> </value>
+            <value> <string>active_process, fixit=False, filter_dict={}</string> </value>
         </item>
         <item>
             <key> <string>id</string> </key>
-            <value> <string>ERP5Site_upgradeGlobalPropertyList</string> </value>
+            <value> <string>Alarm_checkUpgraderConsistency</string> </value>
         </item>
       </dictionary>
     </pickle>

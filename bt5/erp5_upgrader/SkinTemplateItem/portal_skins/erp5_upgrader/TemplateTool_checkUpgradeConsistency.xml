@@ -50,40 +50,21 @@
         </item>
         <item>
             <key> <string>_body</string> </key>
-            <value> <string encoding="cdata"><![CDATA[
-
-"""\n
-  Verify if this instance is a properly configured one.\n
-  This script could be used in functional tests\n
-"""\n
-portal = context.getPortalObject()\n
+            <value> <string>bt5_list, keep_bt5_id_set = context.Base_getUpgradeBusinessTemplateList()\n
 \n
-message_list = []\n
-\n
-activity_failure_list = context.portal_activities.getMessageList(processing_node=-2)\n
-\n
-if len(activity_failure_list) > 0:\n
-  message_list.append("Activity Failures was found (%s)." % (len(activity_failure_list),))\n
-return message_list\n
-
-
-]]></string> </value>
+template_tool = context.getPortalObject().portal_templates\n
+return template_tool.upgradeSite(bt5_list,\n
+  keep_bt5_id_set=keep_bt5_id_set,\n
+  dry_run=(not fixit))\n
+</string> </value>
         </item>
         <item>
             <key> <string>_params</string> </key>
-            <value> <string></string> </value>
-        </item>
-        <item>
-            <key> <string>_proxy_roles</string> </key>
-            <value>
-              <tuple>
-                <string>Manager</string>
-              </tuple>
-            </value>
+            <value> <string>fixit=False, **kw</string> </value>
         </item>
         <item>
             <key> <string>id</string> </key>
-            <value> <string>ERP5Site_verifyActivityIntegrity</string> </value>
+            <value> <string>TemplateTool_checkUpgradeConsistency</string> </value>
         </item>
       </dictionary>
     </pickle>

@@ -14,17 +14,13 @@
             <key> <string>alarm_notification_mode</string> </key>
             <value>
               <tuple>
-                <string>never</string>
+                <string>always</string>
               </tuple>
             </value>
         </item>
         <item>
             <key> <string>description</string> </key>
-            <value> <string>This alarms acts as a cron job. It will start an instance upgrade if any of the following this alarms sequence:\n
-1) bt5_upgrader (supported)\n
-2) finalize_upgrader (supported)\n
-\n
-"sense" a need of an upgrade. This alarm is likely to disappear soon as it\'s needed due to lack of functionality (which is that alarms can not automatically "solve" themselves).</string> </value>
+            <value> <string>This step will run all constraints that have contraint_type equal pre_upgrade.</string> </value>
         </item>
         <item>
             <key> <string>enabled</string> </key>
@@ -32,7 +28,7 @@
         </item>
         <item>
             <key> <string>id</string> </key>
-            <value> <string>upgrader_controller</string> </value>
+            <value> <string>upgrader_check_pre_upgrade</string> </value>
         </item>
         <item>
             <key> <string>periodicity_hour</string> </key>
@@ -48,7 +44,9 @@
         </item>
         <item>
             <key> <string>periodicity_minute_frequency</string> </key>
-            <value> <int>30</int> </value>
+            <value>
+              <none/>
+            </value>
         </item>
         <item>
             <key> <string>periodicity_month</string> </key>
@@ -74,7 +72,7 @@
                 </tuple>
                 <state>
                   <tuple>
-                    <float>1136073600.0</float>
+                    <float>1384423200.0</float>
                     <string>GMT</string>
                   </tuple>
                 </state>
@@ -98,8 +96,12 @@
             </value>
         </item>
         <item>
+            <key> <string>solve_method_id</string> </key>
+            <value> <string>Alarm_runPreUpgrade</string> </value>
+        </item>
+        <item>
             <key> <string>title</string> </key>
-            <value> <string>Upgrader Controller</string> </value>
+            <value> <string>Run Pre Upgrade</string> </value>
         </item>
       </dictionary>
     </pickle>

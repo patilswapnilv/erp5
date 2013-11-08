@@ -51,33 +51,35 @@
         <item>
             <key> <string>_body</string> </key>
             <value> <string>"""\n
+  Run Post upgrade\n
 """\n
-message_list = []\n
-portal_alarms = context.portal_alarms\n
-alarm_tool_configuration_list = context.ERP5Site_getUpgraderSignature().get(\'alarm_tool_configuration_list\', [])\n
-if alarm_tool_configuration_list is None:\n
-  return message_list\n
+portal_alarms = context.getPortalObject().portal_alarms\n
+active_process = context.newActiveProcess()\n
 \n
-for alarm_id, is_enabled in alarm_tool_configuration_list:  \n
-  obj = getattr(portal_alarms, alarm_id, None)\n
-  if obj is not None and int(obj.getEnabled()) != int(is_enabled):\n
-    message = "Upgrade is required for Alarm %s, enabled = %s (expected %s)" % \\\n
-                (alarm_id, obj.getEnabled(),is_enabled )\n
-    if int(upgrade) == 1:\n
-      obj.setEnabled(int(is_enabled))\n
-      message = "[ UPDATED ] " + message\n
-    message_list.append(message)\n
-    \n
-return message_list\n
+# We should not run post upgrade if upgrader was not solved or never executed\n
+alarm = getattr(portal_alarms, \'upgrader_check_upgrader\')\n
+if alarm.sense() in (None, True):\n
+  active_process.postActiveResult(summary=context.getTitle(),\n
+      severity=1,\n
+      detail="Is required run upgrade before solve it. " +\\\n
+        "You need run active sense once at least on this alarm")\n
+  return\n
+\n
+context.Alarm_checkUpgraderConsistency(fixit=True,\n
+  active_process=active_process,\n
+  filter_dict={"constraint_type": ["post_upgrade",]})\n
+\n
+context.setEnabled(False)\n
+return\n
 </string> </value>
         </item>
         <item>
             <key> <string>_params</string> </key>
-            <value> <string>upgrade=0</string> </value>
+            <value> <string>**kw</string> </value>
         </item>
         <item>
             <key> <string>id</string> </key>
-            <value> <string>ERP5Site_upgradeAlarmToolConfiguration</string> </value>
+            <value> <string>Alarm_runPostUpgrade</string> </value>
         </item>
       </dictionary>
     </pickle>

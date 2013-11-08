@@ -50,41 +50,16 @@
         </item>
         <item>
             <key> <string>_body</string> </key>
-            <value> <string encoding="cdata"><![CDATA[
-
+            <value> <string>"""\n
+  Run Pre upgrade\n
 """\n
-  Here we make sure the installed bt5 are the right ones.\n
-  If the installed bt5 are too old, then they must be upgraded\n
+context.Alarm_checkUpgraderConsistency(fixit=True,\n
+  active_process=context.newActiveProcess(),\n
+  filter_dict={"constraint_type": ["pre_upgrade"]})\n
 \n
-  NOTE: some day, we will mix multiple bt5 sources. The code\n
-  will be a bit longer. It could be a good idea to create\n
-  a kind of dict or a central data structure somewhere (like\n
-  the system signature in portal_introspections) instead of\n
-  having to repeat everywhere 5.4.3 or other release numbers.\n
-\n
-  NOTE: the idea is to call a long list of "check list" scripts,\n
-  each of which has a "check" part and a "fix" (ie. upgrade) part, just like\n
-  constraints in ERP5. However, the order is very important\n
-  for upgrade, unlike constraints. And we need to be able\n
-  to override upgrade scripts for certain source releases.\n
-\n
-  NOTE2: you can split if needed the upgrade process into more\n
-  alarms (this can be useful if restart is needed for example\n
-  between stages of upgrade)\n
-"""\n
-# Setup skins\n
-context.ERP5Site_setupUpgraderSkinSelection()\n
-\n
-# Right way is like this\n
-# Now start the update\n
-\n
-if len(context.ERP5Site_upgradeBusinessTemplateList()) > 0: \n
-  return True\n
-\n
-return False\n
-
-
-]]></string> </value>
+context.setEnabled(False)\n
+return\n
+</string> </value>
         </item>
         <item>
             <key> <string>_params</string> </key>
@@ -92,7 +67,7 @@ return False\n
         </item>
         <item>
             <key> <string>id</string> </key>
-            <value> <string>Alarm_senseBT5Version</string> </value>
+            <value> <string>Alarm_runPreUpgrade</string> </value>
         </item>
       </dictionary>
     </pickle>
