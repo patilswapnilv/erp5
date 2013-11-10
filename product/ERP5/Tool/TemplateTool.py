@@ -1022,8 +1022,9 @@ class TemplateTool (BaseTool):
             undependent_list.append(dependency_id)
 
       if len(sorted_bt_list) != len(bt_list):
-        raise NotImplementedError, \
-          "Circular dependencies on %s" % reverse_dependency_dict.keys()
+        raise NotImplementedError(
+            "Circular dependencies on %s, %s != %s" % (reverse_dependency_dict.keys(),
+              ', '.join(sorted_bt_list), ', '.join(bt_list)))
       else:
         return sorted_bt_list
 
@@ -1323,9 +1324,15 @@ class TemplateTool (BaseTool):
             "Impossible to install, please install the following dependencies before: %s" \
             % [x[1] for x in missing_dependency_list]
 
+      template_url_dict = self._getBusinessTemplateUrlDict()
       activate_kw =  dict(activity="SQLQueue", tag="start_%s" % (time.time()))
-
       for repository, bt_id in resolved_template_list:
+        bt = template_url_dict.get(bt_id)
+        if bt is not None and bt_id in installed_bt5_set:
+          revision = int(bt['revision'])
+          installed_bt5 = self.getInstalledBusinessTemplate(bt_id)
+          if int(installed_bt5.getRevision()) <= revision and only_newer:
+            continue
         bt_url = '%s/%s' % (repository, bt_id)
         param_dict = dict(download_url=bt_url, only_newer=only_newer)
         if update_catalog is not _MARKER:
