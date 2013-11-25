@@ -1287,6 +1287,25 @@ class Folder(CopyContainer, CMFBTreeFolder, CMFHBTreeFolder, Base, FolderMixIn):
                                        'recursiveReindexObject')
     reindex(*args, **kw)
 
+  security.declareProtected(Permissions.AccessContentsInformation,
+      'recursiveCheckConsistency')
+  def recursiveCheckConsistency(self, fixit=False, filter=None, **kw):
+    error_list = []
+    if self.objectCount() > REINDEX_SPLIT_COUNT:
+      portal_catalog = self.getPortalObject().portal_catalog
+      portal_catalog.searchAndActivate('checkConsistency',
+          parent_uid=self.getUid(),
+          method_kw={'fixit': fixit, 'filter': filter}, **kw)
+    else:
+      for obj in self.contentValues():
+        if obj.providesIConstraint():
+          # it is not possible to checkConsistency of Constraint itself, as method
+          # of this name implement consistency checking on object
+          continue
+        error_list += obj.checkConsistency(fixit=fixit, filter=filter, **kw)
+
+    return error_list
+
   security.declarePublic( 'recursiveReindexObject' )
   def recursiveReindexObject(self, activate_kw=None, **kw):
     """Recursively indexes the content of self.
@@ -1414,19 +1433,12 @@ class Folder(CopyContainer, CMFBTreeFolder, CMFHBTreeFolder, Base, FolderMixIn):
     # in case we erased some data
     if fixit:
       transaction.savepoint(optimistic=True)
+
+    if 'recursive' in kw and kw.pop("recursive") is False:
+      return error_list
+
     # Then check the consistency on all sub objects
-    for obj in self.contentValues():
-      if obj.providesIConstraint():
-        # it is not possible to checkConsistency of Constraint itself, as method
-        # of this name implement consistency checking on object
-        continue
-      if fixit:
-        extra_errors = obj.fixConsistency(filter=filter, **kw)
-      else:
-        extra_errors = obj.checkConsistency(filter=filter, **kw)
-      if len(extra_errors) > 0:
-        error_list += extra_errors
-    # We should also return an error if any
+    error_list += self.recursiveCheckConsistency(fixit=False, filter=None, **kw)
     return error_list
 
   security.declareProtected(Permissions.AccessContentsInformation, 'asXML')

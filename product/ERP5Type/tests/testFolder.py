@@ -27,7 +27,6 @@
 ##############################################################################
 
 import unittest
-
 from Products.ERP5Type.tests.ERP5TypeTestCase import ERP5TypeTestCase
 from zLOG import LOG
 from Products.ERP5Type.tests.utils import LogInterceptor
@@ -36,6 +35,7 @@ from Products.ERP5Type.ERP5Type import ERP5TypeInformation
 from Products.ERP5Type.Cache import clearCache
 from AccessControl.ZopeGuards import guarded_getattr
 from zExceptions import Unauthorized
+from Products.ERP5Type.Core.Folder import REINDEX_SPLIT_COUNT
 
 class TestFolder(ERP5TypeTestCase, LogInterceptor):
 
@@ -266,6 +266,30 @@ class TestFolder(ERP5TypeTestCase, LogInterceptor):
               self.folder.absolute_url(relative=True), obj.getId()))
       self.assertTrue(obj.getId() in self.folder.objectIds())
       self.assertEquals(302, response.getStatus())
+
+    def test_FolderRecursiveCheckConsistency(self):
+      """ Test if calling checkConsisency in the folder it creates activities
+      when number sub objects are big"""
+      type_list = ['Category',]
+      self._setAllowedContentTypesForFolderType(type_list)
+      for index in xrange(REINDEX_SPLIT_COUNT):
+        self.folder.newContent(portal_type="Category")
+      self.tic()
+      self.folder.checkConsistency()
+      self.commit()
+      portal_activities = self.portal.portal_activities
+      self.assertEquals(portal_activities.getMessageList(), [])
+      self.folder.newContent(portal_type="Category")
+      self.tic()
+      self.folder.checkConsistency()
+      self.commit()
+      message_list = portal_activities.getMessageList()
+      self.assertNotEquals(message_list, [])
+      method_id_set = set([message.method_id for message in message_list])
+      method_set = set([message.args[-1] for message in message_list])
+      self.assertEquals(method_id_set, set(['callMethodOnObjectList',]))
+      self.assertEquals(method_set, set(['checkConsistency',]))
+      self.abort()
 
 def test_suite():
   suite = unittest.TestSuite()
