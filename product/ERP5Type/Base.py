@@ -2558,18 +2558,18 @@ class Base( CopyContainer,
 
     for constraint_instance in self._filteredConstraintList(filter):
       if fixit:
-        error_list2 = UnrestrictedMethod(
+        extra_error_list = UnrestrictedMethod(
           constraint_instance.fixConsistency)(self, **kw)
       else:
-        error_list2 = UnrestrictedMethod(
+        extra_error_list = UnrestrictedMethod(
           constraint_instance.checkConsistency)(self, **kw)
-      if len(error_list2) > 0:
+      if len(extra_error_list) > 0:
         try:
           constraint_instance.checkConsistency(self, **kw)
         except Unauthorized:
           error_list.append(getUnauthorizedErrorMessage(constraint_instance))
         else:
-          error_list += error_list2
+          error_list += extra_error_list
 
     if fixit and len(error_list) > 0:
       self.reindexObject()
