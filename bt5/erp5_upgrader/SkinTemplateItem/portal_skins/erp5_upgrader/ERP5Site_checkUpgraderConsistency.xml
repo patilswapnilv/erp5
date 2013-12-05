@@ -108,7 +108,7 @@ for portal_type, constraint_type_list in constraint_type_per_type.iteritems():\n
         </item>
         <item>
             <key> <string>id</string> </key>
-            <value> <string>Alarm_checkUpgraderConsistency</string> </value>
+            <value> <string>ERP5Site_checkUpgraderConsistency</string> </value>
         </item>
       </dictionary>
     </pickle>

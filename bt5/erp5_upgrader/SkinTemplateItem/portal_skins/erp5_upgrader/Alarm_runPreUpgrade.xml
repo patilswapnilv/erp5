@@ -53,7 +53,7 @@
             <value> <string>"""\n
   Run Pre upgrade\n
 """\n
-context.Alarm_checkUpgraderConsistency(fixit=True,\n
+context.ERP5Site_checkUpgraderConsistency(fixit=True,\n
   active_process=context.newActiveProcess(),\n
   filter_dict={"constraint_type": ["pre_upgrade"]})\n
 \n
