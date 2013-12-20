@@ -26,7 +26,7 @@
 #
 ##############################################################################
 
-import os, sys
+import os, re, sys
 
 if sys.version_info < (2, 7):
 
@@ -100,28 +100,54 @@ if 1:
 from docutils import utils
 utils.relative_path = lambda source, target: os.path.abspath(target)
 
-import linecache
+def patch_linecache():
+  import linecache
+  from os.path import basename
 
-linecache_getlines = linecache.getlines
-def getlines(filename, module_globals=None):
-  """
-  Patch of linecache module (used in traceback and pdb module) to Python
-  Script source code properly without requiring to create a temporary file on
-  the filesystem
+  expr_search = re.compile('^Python expression "(.+)"$').search
 
-  The filename is '(FILENAME)?Script \(Python\)' for Zope Python Scripts.
+  def get_globals(frame):
+    m = frame.f_globals['__name__']
+    if m == 'linecache':
+      frame = frame.f_back
+      m = frame.f_globals['__name__']
+    if m == 'IPython.core.debugger':
+      co_name = frame.f_code.co_name
+      if co_name == 'format_stack_entry':
+        return frame.f_locals['frame'].f_globals
+      elif co_name == 'print_list_lines':
+        return frame.f_locals['self'].curframe.f_globals
 
-  linecache.cache filled by linecache.updatecache() called by the original
-  linecache.getlines() is bypassed for Python Script to avoid getting
-  inconsistent source code. Having no cache could be an issue if performances
-  would be required here but as linecache module is only called by traceback
-  and pdb modules not used often, this should not be an issue.
+  linecache_getlines = linecache.getlines
+  def getlines(filename, module_globals=None):
+    """
+    Patch of linecache module (used in traceback and pdb module) to Python
+    Script source code properly without requiring to create a temporary file on
+    the filesystem
 
-  """
-  if (filename and module_globals and
-      'Script (Python)' in filename and 'script' in module_globals):
-    return module_globals['script'].body().splitlines(keepends=True)
+    The filename is '(FILENAME)?Script \(Python\)' for Zope Python Scripts.
 
-  return linecache_getlines(filename, module_globals)
+    linecache.cache filled by linecache.updatecache() called by the original
+    linecache.getlines() is bypassed for Python Script to avoid getting
+    inconsistent source code. Having no cache could be an issue if performances
+    would be required here but as linecache module is only called by traceback
+    and pdb modules not used often, this should not be an issue.
 
-linecache.getlines = getlines
+    """
+    if filename:
+      if basename(filename) == 'Script (Python)':
+        try:
+          script = (module_globals or get_globals(sys._getframe(1)))['script']
+          if script._p_jar.opened:
+            return script.body().splitlines(True)
+        except Exception:
+          pass
+        return ()
+      x = expr_search(filename)
+      if x:
+        return x.groups()
+    return linecache_getlines(filename, module_globals)
+
+  linecache.getlines = getlines
+
+patch_linecache()
