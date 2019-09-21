@@ -5,6 +5,7 @@
 
   rJS(window)
 
+    .setState({auto_sync: true, check_pwd: true})
     /////////////////////////////////////////////////////////////////
     // Acquired methods
     /////////////////////////////////////////////////////////////////
@@ -18,6 +19,16 @@
     /////////////////////////////////////////////////////////////////
     // declared methods
     /////////////////////////////////////////////////////////////////
+    .onEvent('click', function (event) {
+      var gadget = this;
+
+      if (event.target.id === "saveOPMLNoPwd") {
+        return gadget.changeState({check_pwd: false})
+          .push(function () {
+            return gadget.element.querySelector('button[type="submit"]').click();
+          });
+      }
+    }, false, false)
     .onEvent('submit', function () {
       var gadget = this,
         opml_gadget,
@@ -42,24 +53,41 @@
             return gadget.notifySubmitting()
               .push(function () {
                 doc.title = "";
-                return opml_gadget.saveOPML(doc, true);
+                return opml_gadget.saveOPML(doc, gadget.state.check_pwd);
               })
-              .push(function (status) {
+              .push(function (state) {
                 var msg = {message: 'OPML document added', status: 'success'};
-                if (!status) {
+                if (!state) {
                   msg = {message: 'Failed to add OPML document', status: "error"};
                 }
                 return RSVP.all([
                   gadget.notifySubmitted(msg),
-                  status
+                  state
                 ]);
               })
               .push(function (result_list) {
-                if (result_list[1]) {
+                if (result_list[1].status) {
+                  if (gadget.state.auto_sync) {
+                    return gadget.getDeclaredGadget('sync_gadget')
+                      .push(function (sync_gadget) {
+                        // start synchronization now
+                        return sync_gadget.register({now: true});
+                      })
+                      .push(function () {
+                        return gadget.redirect({
+                          "command": "display",
+                          "options": {"page": "ojsm_status_list"}
+                        });
+                      });
+                  }
                   return gadget.redirect({
                     "command": "display",
                     "options": {"page": "settings_configurator"}
                   });
+                }
+                if (result_list[1].can_force) {
+                  gadget.element.getElementsByClassName("btn-nopasswd")[0]
+                    .style.display = "";
                 }
               });
           }
@@ -74,6 +102,9 @@
       var gadget = this;
       return RSVP.Queue()
         .push(function () {
+          var button_no_pwd = gadget.element.getElementsByClassName("btn-nopasswd");
+
+          button_no_pwd[0].style.display = "none";
           return RSVP.all([
             gadget.getDeclaredGadget('form_view'),
             gadget.getSetting('portal_type')
@@ -179,6 +210,12 @@
           });
         })
         .push(function () {
+          return gadget.getSetting("opml_add_auto_sync", "on");
+        })
+        .push(function (auto_sync) {
+          return gadget.changeState({auto_sync: auto_sync === "on"});
+        })
+        .push(function () {
           var new_options;
 
           if (options.chg_passwd === 'true') {
@@ -194,6 +231,14 @@
             save_action: true,
             change_password: chg_pwd_url
           });
+        })
+        .push(function () {
+          return gadget.checkSynchronize();
         });
+    })
+    .declareJob("checkSynchronize", function () {
+      if (this.state.auto_sync) {
+        return this.element.querySelector('button[type="submit"]').click();
+      }
     });
 }(window, rJS, RSVP));

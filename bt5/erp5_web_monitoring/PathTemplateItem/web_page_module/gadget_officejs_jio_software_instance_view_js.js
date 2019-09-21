@@ -1,6 +1,6 @@
-/*global window, rJS, RSVP, Handlebars */
+/*global window, rJS, RSVP, Handlebars, atob */
 /*jslint nomen: true, indent: 2, maxerr: 3 */
-(function (window, rJS, RSVP, Handlebars) {
+(function (window, rJS, RSVP, Handlebars, atob) {
   "use strict";
 
   var gadget_klass = rJS(window),
@@ -10,17 +10,10 @@
     link_template = Handlebars.compile(source);
   gadget_klass
     .setState({
-      jio_gadget: "",
       instance: "",
       opml: "",
       opml_outline: "",
       graph_value: {}
-    })
-    .ready(function (gadget) {
-      return gadget.getDeclaredGadget("jio_gadget")
-        .push(function (jio_gadget) {
-          return gadget.changeState({"jio_gadget": jio_gadget});
-        });
     })
     /////////////////////////////////////////////////////////////////
     // Acquired methods
@@ -30,8 +23,6 @@
     .declareAcquiredMethod("getUrlFor", "getUrlFor")
     .declareAcquiredMethod("jio_get", "jio_get")
     .declareAcquiredMethod("jio_allDocs", "jio_allDocs")
-    .declareAcquiredMethod("notifySubmitting", "notifySubmitting")
-    .declareAcquiredMethod("notifySubmitted", 'notifySubmitted')
     .declareAcquiredMethod("translateHtml", "translateHtml")
     .declareAcquiredMethod("redirect", "redirect")
     /////////////////////////////////////////////////////////////////
@@ -39,11 +30,7 @@
     /////////////////////////////////////////////////////////////////
 
     .declareMethod("render", function (options) {
-      var gadget = this,
-        hosting_subscription,
-        software_instance,
-        opml_outline,
-        opml_doc;
+      var gadget = this;
 
       return new RSVP.Queue()
         .push(function () {
@@ -67,16 +54,6 @@
           });
         })
         .push(function () {
-          return gadget.state.jio_gadget.createJio({
-            type: "webhttp",
-            // XXX fix of url
-            url: gadget.state.instance._links.private_url.href
-              .replace("jio_private", "private") +
-              'documents/',
-            basic_login: gadget.state.opml.basic_login
-          });
-        })
-        .push(function () {
           return gadget.getUrlFor({command: 'push_history', options: {
             jio_key: options.doc.reference,
             page: 'ojsm_hosting_subscription_view',
@@ -87,35 +64,49 @@
           var pass_url,
             public_url,
             private_url,
+            rss_url,
             current_document = gadget.state.instance;
 
+          if (current_document._embedded !== undefined &&
+              current_document._embedded.hasOwnProperty('instance')) {
+            current_document.ipv6 = current_document._embedded.instance.ipv6;
+            current_document.ipv4 = current_document._embedded.instance.ipv4;
+            current_document.partition_id = current_document._embedded.instance.partition;
+            current_document.software_release = current_document._embedded.instance['software-release'];
+          }
           // fix URLs
-          private_url = gadget.state.instance._links
-            .private_url.href.replace("jio_private", "private");
-          public_url = gadget.state.instance._links.
-            public_url.href.replace("jio_public", "public");
-          pass_url = "https://" + atob(gadget.state.opml.basic_login) +
-            "@" + private_url.split("//")[1];
+          if (gadget.state.instance._links !== undefined) {
+            private_url = gadget.state.instance._links
+              .private_url.href.replace("jio_private", "private");
+            public_url = gadget.state.instance._links
+              .public_url.href.replace("jio_public", "public");
+            pass_url = "https://" + atob(gadget.state.opml.basic_login) +
+              "@" + private_url.split("//")[1];
+            rss_url = current_document._links.rss_url.href;
+          }
+          if (gadget.state.instance.state === undefined) {
+            current_document.state = {error: "", success: ""};
+          }
 
           return gadget.changeState({
             jio_key: options.jio_key,
             status: gadget.state.instance.status,
-            report_date: new Date(gadget.state.instance.date),
+            report_date: gadget.state.instance.date,
             title: current_document.title,
             error: current_document.state.error,
             success: current_document.state.success,
             public_url: public_url,
             private_url: pass_url,
-            rss_url: current_document._links.rss_url.href,
+            rss_url: rss_url,
             //resource_url: tmp_url,
             //process_url: tmp_process_url,
             hosting_title: gadget.state.opml.title,
             hosting_url: hosting_url,
-            partition_ipv6: current_document._embedded.instance.ipv6,
-            partition_ipv4: current_document._embedded.instance.ipv4,
-            computer_partition: current_document._embedded.instance.partition,
-            computer_reference: current_document._embedded.instance.computer,
-            software_release: current_document._embedded.instance['software-release']
+            partition_ipv6: current_document.ipv6,
+            partition_ipv4: current_document.ipv4,
+            computer_partition: current_document.partition_id,
+            computer_reference: current_document.aggregate_reference,
+            software_release: current_document.software_release
           });
         });
     })
@@ -133,63 +124,60 @@
       var gadget = this;
       return gadget.jio_allDocs(param_list[0])
         .push(function (result) {
-          var i, value, len = result.data.total_rows;
+          var i, j, tmp, value, len = result.data.total_rows;
           for (i = 0; i < len; i += 1) {
             if (result.data.rows[i].value.hasOwnProperty("lastBuildDate")) {
-              value = new Date(result.data.rows[i].value.lastBuildDate);
               result.data.rows[i].value.lastBuildDate = {
-                allow_empty_time: 0,
-                ampm_time_style: 0,
-                css_class: "date_field",
-                date_only: 0,
-                description: "The Date",
-                editable: 0,
-                hidden: 0,
-                hidden_day_is_last_day: 0,
-                "default": value.toUTCString(),
-                key: "lastBuildDate",
-                required: 0,
-                timezone_style: 0,
-                title: "Promise Date",
-                type: "DateTimeField"
+                field_gadget_param: {
+                  allow_empty_time: 0,
+                  ampm_time_style: 0,
+                  css_class: "date_field",
+                  date_only: 0,
+                  description: "The Date",
+                  editable: 0,
+                  hidden: 0,
+                  hidden_day_is_last_day: 0,
+                  "default": result.data.rows[i].value.lastBuildDate,
+                  key: "lastBuildDate",
+                  required: 0,
+                  timezone_style: 1,
+                  title: "Promise Date",
+                  type: "DateTimeField"
+                }
               };
               result.data.rows[i].value["listbox_uid:list"] = {
                 key: "listbox_uid:list",
                 value: 2713
               };
             }
-            if (result.data.rows[i].value.hasOwnProperty("comments")) {
-              value = result.data.rows[i].value.comments.slice(0, 30);
-              if (result.data.rows[i].value.comments.length >= 30) {
-                value += "...";
+            if (result.data.rows[i].value.hasOwnProperty("description")) {
+              tmp = result.data.rows[i].value.description.split('\n');
+              value = "";
+              for (j = 1; j < tmp.length; j += 1) {
+                // first line of text is the date and status
+                if (!value && tmp[j].trim() !== "") {
+                  value += tmp[j].slice(0, 80);
+                  if (tmp[j].length >= 80 || j + 1 < tmp.length) {
+                    // a part of text is not shown
+                    value += "...";
+                  }
+                }
               }
-              result.data.rows[i].value.comments = {
-                css_class: "string_field",
-                description: "The Message",
-                editable: 0,
-                hidden: 0,
-                "default": value,
-                key: "comments",
-                required: 0,
-                title: "Message",
-                type: "StringField"
-              };
-              result.data.rows[i].value["listbox_uid:list"] = {
-                key: "listbox_uid:list",
-                value: 2713
-              };
+              result.data.rows[i].value.description = value;
             }
             if (result.data.rows[i].value.hasOwnProperty("category")) {
               value = result.data.rows[i].value.category;
               result.data.rows[i].value.category = {
-                css_class: "",
-                description: "The Status",
-                hidden: 0,
-                "default": value,
-                key: "category",
-                url: "gadget_erp5_field_status.html",
-                title: "Status",
-                type: "GadgetField"
+                field_gadget_param: {
+                  css_class: "",
+                  description: "The Status",
+                  hidden: 0,
+                  "default": value,
+                  key: "category",
+                  url: "gadget_erp5_field_status.html",
+                  title: "Status",
+                  type: "GadgetField"
+                }
               };
               result.data.rows[i].value["listbox_uid:list"] = {
                 key: "listbox_uid:list",
@@ -202,86 +190,97 @@
     })
     .onStateChange(function () {
       var gadget = this,
-        graph_value = {};
+        graph_data;
       if (!gadget.state.hasOwnProperty('status') &&
           !gadget.state.hasOwnProperty('title')) {
         return;
       }
       return new RSVP.Queue()
         .push(function () {
-          // Move this to not slow down the page rendering...
-          return gadget.state.jio_gadget.get(
-            gadget.state.instance.data.state
-          )
-            .push(undefined, function (error) {
-              console.log(error);
-              return {};
-            })
-            .push(function (element_dict) {
-              var promise_data = [
-                  "Date, Success, Error, Warning",
-                  new Date() + ",0,0,0"
-                ],
-                data = element_dict.data || promise_data,
-                data_list = [],
-                line_list,
-                i;
+          var graph_options = {
+            data_url: "",
+            data_filename: "monitor_state.data",
+            basic_login: ""
+          };
 
-              data_list.push({
-                value_dict: {"0": [], "1": []},
-                type: "scatter",
-                axis_mapping_id_dict: {"1": "1_1"},
-                title: "promises success"
-              });
-              data_list.push({
-                value_dict: {"0": [], "1": []},
-                type: "scatter",
-                axis_mapping_id_dict: {"1": "1_2"},
-                title: "promises error"
-              });
-              for (i = 1; i < data.length; i += 1) {
-                line_list = data[i].split(',');
-                data_list[0].value_dict["0"].push(line_list[0]);
-                data_list[0].value_dict["1"].push(line_list[1]);
-    
-                // XXX repeating date entry
-                data_list[1].value_dict["0"].push(line_list[0]);
-                data_list[1].value_dict["1"].push(line_list[2]);
-              }
-              graph_value = {
-                data: data_list,
-                layout: {
-                  axis_dict : {
-                    "0": {
-                      "title": "Success/Failure Progression",
-                      "scale_type": "linear",
-                      "value_type": "date"
-                    },
-                    "1_1": {
-                      "title": "Promises success",
-                      "position": "right"
-                    },
-                    "1_2": {
-                      "title": "Promises error",
-                      "position": "right"
-                    }
-                  },
-                  title: "Success/Failure Progression"
-                }
-              };
+          if (gadget.state.instance._links !== undefined) {
+            graph_options  = {
+              data_url: gadget.state.instance._links.private_url.href +
+                'documents/',
+              data_filename: gadget.state.instance.data.state,
+              basic_login: gadget.state.opml.basic_login
+            };
+          }
+
+          graph_options.extract_method = function (element_dict) {
+            var promise_data = [
+                "Date, Success, Error",
+                new Date() + ",0,0"
+              ],
+              data = element_dict.data || promise_data,
+              data_list = [],
+              line_list,
+              i;
+
+            data_list.push({
+              value_dict: {"0": [], "1": []},
+              type: "scatter",
+              axis_mapping_id_dict: {"1": "1_1"},
+              title: "promises success"
             });
+            data_list.push({
+              value_dict: {"0": [], "1": []},
+              type: "scatter",
+              axis_mapping_id_dict: {"1": "1_2"},
+              title: "promises error"
+            });
+            for (i = 1; i < data.length; i += 1) {
+              line_list = data[i].split(',');
+              data_list[0].value_dict["0"].push(line_list[0]);
+              data_list[0].value_dict["1"].push(line_list[1]);
+
+              // XXX repeating date entry
+              data_list[1].value_dict["0"].push(line_list[0]);
+              data_list[1].value_dict["1"].push(line_list[2]);
+            }
+            return data_list;
+          };
+          graph_options.data_dict = {
+            data: {},
+            layout: {
+              axis_dict : {
+                "0": {
+                  "title": "Promises Failure Progression",
+                  "scale_type": "linear",
+                  "value_type": "date"
+                },
+                "1_1": {
+                  "title": "Promises success",
+                  "position": "right"
+                },
+                "1_2": {
+                  "title": "Promises error",
+                  "position": "right"
+                }
+              },
+              title: "Promises Failure Progression"
+            }
+          };
+          return graph_options;
         })
-        .push(function () {
+        .push(function (g) {
+          graph_data = g;
           //gadget.element.querySelector('.template-view').innerHTML = html;
           return gadget.getDeclaredGadget('form_view');
         })
         .push(function (form_gadget) {
           var column_list = [
-            ['source', 'Promise'],
-            ['lastBuildDate', 'Promise Date'],
-            ['comments', 'Message'],
-            ['category', 'Status']
-          ];
+              ['category', 'Status'],
+              ['source', 'Promise'],
+              ['lastBuildDate', 'Promise Date'],
+              ['description', 'Message']
+            ],
+            hide_link = (gadget.state.instance._links === undefined) ? 1 :  0;
           return form_gadget.render({
             erp5_document: {
               "_embedded": {"_view": {
@@ -311,13 +310,13 @@
                 "your_report_date": {
                   "description": "",
                   "title": "Report Date",
-                  "default": gadget.state.report_date.toUTCString(),
+                  "default": gadget.state.report_date,
                   "css_class": "",
                   "required": 0,
                   "editable": 0,
                   "key": "report_date",
                   "hidden": 0,
-                  "timezone_style": 0,
+                  "timezone_style": 1,
                   "date_only": 0,
                   "type": "DateTimeField"
                 },
@@ -333,7 +332,7 @@
                   "required": 0,
                   "editable": 0,
                   "key": "public_url",
-                  "hidden": 0,
+                  "hidden": hide_link,
                   "type": "EditorField"
                 },
                 "your_private_url": {
@@ -348,13 +347,13 @@
                   "required": 0,
                   "editable": 0,
                   "key": "private_url",
-                  "hidden": 0,
+                  "hidden": hide_link,
                   "type": "EditorField"
                 },
                 "your_error_count": {
                   "description": "",
                   "title": "Promises Error",
-                  "default": "" + gadget.state.error,
+                  "default": String(gadget.state.error),
                   "css_class": "",
                   "required": 0,
                   "editable": 0,
@@ -365,7 +364,7 @@
                 "your_success_count": {
                   "description": "",
                   "title": "Promises OK",
-                  "default": "" + gadget.state.success,
+                  "default": String(gadget.state.success),
                   "css_class": "",
                   "required": 0,
                   "editable": 0,
@@ -385,7 +384,7 @@
                   "required": 0,
                   "editable": 0,
                   "key": "software_release_url",
-                  "hidden": 0,
+                  "hidden": hide_link,
                   "type": "EditorField"
                 },
                 "your_rss_url": {
@@ -400,7 +399,7 @@
                   "required": 0,
                   "editable": 0,
                   "key": "rss_url",
-                  "hidden": 0,
+                  "hidden": hide_link,
                   "type": "EditorField"
                 },
                 "your_hosting_title": {
@@ -482,15 +481,15 @@
                   "type": "ListBox"
                 },
                 "your_graph_status": {
-                css_class: "no_label",
-                description: "The Graph Status",
-                hidden: 0,
-                "default": graph_value || {},
-                key: "graph_status",
-                url: "gadget_field_graph_dygraph.html",
-                title: "",
-                type: "GadgetField"
-              }
+                  css_class: "no_label",
+                  description: "The Graph Status",
+                  hidden: 0,
+                  "default": graph_data,
+                  key: "graph_status",
+                  url: "gadget_ojsm_graph_field.html",
+                  title: "",
+                  type: "GadgetField"
+                }
               }},
               "_links": {
                 "type": {
@@ -500,25 +499,34 @@
               }
             },
             form_definition: {
-              group_list: [[
-                "left",
-                [["your_title"], ["your_status"], ["your_status_date"], ["your_report_date"],
-                 ["your_error_count"], ["your_success_count"], ["your_public_url"], ["your_private_url"]]
-              ],
-              [
-                "right",
-                [["your_hosting_title"], ["your_instance_title"], ["your_computer_reference"], ["your_computer_partition"],
-                 ["your_partition_ipv4"], ["your_partition_ipv6"], ["your_software_release_url"],
-                 ["your_rss_url"]]
-              ],
-              [
-                "center",
-                [["your_graph_status"]]
-              ],
-              [
-                "bottom",
-                [["your_instance_promise_list"]]
-              ]]
+              group_list: [
+                [
+                  "left",
+                  [
+                    ["your_title"], ["your_status"], ["your_status_date"],
+                    ["your_report_date"], ["your_error_count"],
+                    ["your_success_count"], ["your_public_url"],
+                    ["your_private_url"]
+                  ]
+                ],
+                [
+                  "right",
+                  [
+                    ["your_hosting_title"], ["your_instance_title"],
+                    ["your_computer_reference"], ["your_computer_partition"],
+                    ["your_partition_ipv4"], ["your_partition_ipv6"],
+                    ["your_software_release_url"], ["your_rss_url"]
+                  ]
+                ],
+                [
+                  "center",
+                  [["your_graph_status"]]
+                ],
+                [
+                  "bottom",
+                  [["your_instance_promise_list"]]
+                ]
+              ]
             }
           });
         })
@@ -538,15 +546,18 @@
           ]);
         })
         .push(function (url_list) {
-          return gadget.updateHeader({
-            page_title: "Instance: " + gadget.state.title,
-            selection_url: url_list[0],
-            previous_url: url_list[1],
-            next_url: url_list[2],
-            resources_url: url_list[3],
-            processes_url: url_list[4],
-            refresh_action: true
-          });
+          var options = {
+              page_title: "Instance: " + gadget.state.title,
+              selection_url: url_list[0],
+              previous_url: url_list[1],
+              next_url: url_list[2],
+              refresh_action: true
+            };
+          if (gadget.state.instance._links !== undefined) {
+            options.resources_url = url_list[3];
+            options.processes_url = url_list[4];
+          }
+          return gadget.updateHeader(options);
         });
     });
-}(window, rJS, RSVP, Handlebars));
+}(window, rJS, RSVP, Handlebars, atob));

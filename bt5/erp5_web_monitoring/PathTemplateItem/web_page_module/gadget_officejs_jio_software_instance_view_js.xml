@@ -67,7 +67,7 @@
             <key> <string>categories</string> </key>
             <value>
               <tuple>
-                <string>classification/collaborative/public</string>
+                <string>classification/collaborative/team</string>
               </tuple>
             </value>
         </item>
@@ -83,7 +83,7 @@
         </item>
         <item>
             <key> <string>default_reference</string> </key>
-            <value> <string>gadget_officejs_monitoring_opml_edit.js</string> </value>
+            <value> <string>gadget_officejs_jio_software_instance_view.js</string> </value>
         </item>
         <item>
             <key> <string>description</string> </key>
@@ -93,11 +93,13 @@
         </item>
         <item>
             <key> <string>id</string> </key>
-            <value> <string>gadget_officejs_monitoring_opml_edit_js</string> </value>
+            <value> <string>gadget_officejs_jio_software_instance_view_js</string> </value>
         </item>
         <item>
             <key> <string>language</string> </key>
-            <value> <string>en</string> </value>
+            <value>
+              <none/>
+            </value>
         </item>
         <item>
             <key> <string>portal_type</string> </key>
@@ -111,7 +113,13 @@
         </item>
         <item>
             <key> <string>title</string> </key>
-            <value> <string>Monitoring OPML edit widget Js</string> </value>
+            <value> <string>OfficeJS Jio Software Instance view JS</string> </value>
+        </item>
+        <item>
+            <key> <string>url_string</string> </key>
+            <value>
+              <none/>
+            </value>
         </item>
         <item>
             <key> <string>version</string> </key>
@@ -197,7 +205,7 @@
                     </tuple>
                     <state>
                       <tuple>
-                        <float>1509018342.18</float>
+                        <float>1507042651.46</float>
                         <string>UTC</string>
                       </tuple>
                     </state>
@@ -242,7 +250,7 @@
             </item>
             <item>
                 <key> <string>serial</string> </key>
-                <value> <string>971.63860.22689.21760</string> </value>
+                <value> <string>972.4061.47106.61696</string> </value>
             </item>
             <item>
                 <key> <string>state</string> </key>
@@ -260,7 +268,7 @@
                     </tuple>
                     <state>
                       <tuple>
-                        <float>1543593317.26</float>
+                        <float>1543848850.64</float>
                         <string>UTC</string>
                       </tuple>
                     </state>
@@ -317,7 +325,7 @@
                     </tuple>
                     <state>
                       <tuple>
-                        <float>1509016096.05</float>
+                        <float>1507042622.22</float>
                         <string>UTC</string>
                       </tuple>
                     </state>

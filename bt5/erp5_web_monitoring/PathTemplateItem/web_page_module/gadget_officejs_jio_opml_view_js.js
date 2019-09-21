@@ -1,7 +1,9 @@
 /*global window, rJS, RSVP, Handlebars */
 /*jslint nomen: true, indent: 2, maxerr: 3 */
-(function (window, rJS, RSVP) {
+(function (window, rJS, RSVP, Rusha) {
   "use strict";
+
+  var rusha = new Rusha();
 
   rJS(window)
     /////////////////////////////////////////////////////////////////
@@ -9,7 +11,6 @@
     /////////////////////////////////////////////////////////////////
     .declareAcquiredMethod("updateHeader", "updateHeader")
     .declareAcquiredMethod("getUrlFor", "getUrlFor")
-    .declareAcquiredMethod("redirect", "redirect")
     .declareAcquiredMethod("notifySubmitting", "notifySubmitting")
     .declareAcquiredMethod("notifySubmitted", 'notifySubmitted')
 
@@ -39,6 +40,8 @@
             doc.confirm_new_password = doc.new_password;
             doc.password = gadget.state.password;
             doc.verify_password = 1;
+          } else {
+            doc.verify_password = (doc.verify_password === "on") ? 1 : 0;
           }
           return opml_gadget.checkOPMLForm(doc);
         })
@@ -46,24 +49,26 @@
           if (state) {
             return gadget.notifySubmitting()
               .push(function () {
+                var verify_opml = doc.title === "" || doc.title === undefined ||
+                    doc.verify_password === 1;
+                if (gadget.state.active === false && doc.active === "on") {
+                  verify_opml = true;
+                }
                 doc.title = gadget.state.opml_title;
-                return opml_gadget.saveOPML(
-                  doc,
-                  doc.title === "" || doc.title === undefined || doc.verify_password === 1
-                );
+                return opml_gadget.saveOPML(doc, verify_opml);
               })
-              .push(function (status) {
+              .push(function (state) {
                 var msg = {message: 'Document Updated', status: 'success'};
-                if (!status) {
+                if (!state.status) {
                   msg = {message: 'Document update failed', status: "error"};
                 }
                 return RSVP.all([
                   gadget.notifySubmitted(msg),
-                  status
+                  state
                 ]);
               })
               .push(function (result) {
-                if (result[1]) {
+                if (result[1].status) {
                   return gadget.changeState({
                     "password": doc.password
                   });
@@ -85,7 +90,8 @@
           return gadget.changeState({
             "opml_title": doc.title || "",
             "opml_key": options.jio_key,
-            "password": doc.password
+            "password": doc.password,
+            "active": doc.active
           });
         })
         .push(function () {
@@ -141,6 +147,17 @@
                   "hidden": 0,
                   "type": "PasswordField"
                 },
+                "my_requested_state": {
+                  "description": "Hosting subscription state",
+                  "title": "Requested State",
+                  "default": doc.state || (doc.active ? "Started" : "Stopped"),
+                  "css_class": "",
+                  "required": 1,
+                  "editable": 0,
+                  "key": "state",
+                  "hidden": 0,
+                  "type": "StringField"
+                },
                 "my_active": {
                   "description": "Sync this opml or not",
                   "title": "Active (Enable Sync)",
@@ -186,7 +203,7 @@
               group_list: [[
                 "left",
                 [["my_title"], ["my_url"], ["my_username"], ["my_password"],
-                  ["my_active"], ["my_verify_password"],
+                  ["my_requested_state"], ["my_active"], ["my_verify_password"],
                   ["my_new_password"]]
               ]]
             }
@@ -195,17 +212,16 @@
         .push(function () {
           return new RSVP.Queue()
             .push(function () {
+              var hosting_key = rusha.digestFromString(gadget.state.opml_key);
               return RSVP.all([
                 gadget.getUrlFor({command: 'history_previous'}),
                 gadget.getUrlFor({command: 'selection_previous'}),
                 gadget.getUrlFor({command: 'selection_next'}),
                 gadget.getUrlFor({command: 'push_history', options: {
                   page: "ojsm_jump",
-                  jio_key: gadget.state.opml_key,
+                  jio_key: hosting_key,
                   title: gadget.state.opml_title,
-                  jump_page: "ojsm_hosting_subscription_view",
-                  view_title: "Related Hosting Subscription",
-                  opml_key: gadget.state.opml_key
+                  view_title: "Related Hosting Subscription"
                 }}),
                 gadget.getUrlFor({command: 'change', options: {
                   page: 'ojsm_opml_delete',
@@ -227,4 +243,4 @@
             });
         });
     });
-}(window, rJS, RSVP));
+}(window, rJS, RSVP, Rusha));

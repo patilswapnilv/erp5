@@ -5,10 +5,7 @@
 
   rJS(window)
     .declareAcquiredMethod("updateHeader", "updateHeader")
-    .declareAcquiredMethod("redirect", "redirect")
-    .declareAcquiredMethod("reload", "reload")
     .declareAcquiredMethod("getSetting", "getSetting")
-    .declareAcquiredMethod("setSetting", "setSetting")
     .declareAcquiredMethod("getUrlFor", "getUrlFor")
     .declareAcquiredMethod("jio_allDocs", "jio_allDocs")
 
@@ -19,22 +16,23 @@
           var i, value, len = result.data.total_rows;
           for (i = 0; i < len; i += 1) {
             if (result.data.rows[i].value.hasOwnProperty("date")) {
-              value = new Date(result.data.rows[i].value.date);
               result.data.rows[i].value.date = {
-                allow_empty_time: 0,
-                ampm_time_style: 0,
-                css_class: "date_field",
-                date_only: 0,
-                description: "The Date",
-                editable: 0,
-                hidden: 0,
-                hidden_day_is_last_day: 0,
-                "default": value.toUTCString(),
-                key: "date",
-                required: 0,
-                timezone_style: 0,
-                title: "Status Date",
-                type: "DateTimeField"
+                field_gadget_param: {
+                  allow_empty_time: 0,
+                  ampm_time_style: 0,
+                  css_class: "date_field",
+                  date_only: 0,
+                  description: "The Date",
+                  editable: 0,
+                  hidden: 0,
+                  hidden_day_is_last_day: 0,
+                  "default": result.data.rows[i].value.date,
+                  key: "date",
+                  required: 0,
+                  timezone_style: 1,
+                  title: "Status Date",
+                  type: "DateTimeField"
+                }
               };
               result.data.rows[i].value["listbox_uid:list"] = {
                 key: "listbox_uid:list",
@@ -44,14 +42,16 @@
             if (result.data.rows[i].value.hasOwnProperty("status")) {
               value = result.data.rows[i].value.status;
               result.data.rows[i].value.status = {
-                css_class: "",
-                description: "The Status",
-                hidden: 0,
-                "default": value,
-                key: "status",
-                url: "gadget_erp5_field_status.html",
-                title: "Status",
-                type: "GadgetField"
+                field_gadget_param: {
+                  css_class: "",
+                  description: "The Status",
+                  hidden: 0,
+                  "default": value,
+                  key: "status",
+                  url: "gadget_erp5_field_status.html",
+                  title: "Status",
+                  type: "GadgetField"
+                }
               };
               result.data.rows[i].value["listbox_uid:list"] = {
                 key: "listbox_uid:list",
@@ -94,10 +94,11 @@
         })
         .push(function (form_list) {
           var column_list = [
+            ['status', 'Status'],
             ['title', 'Instance Title'],
-            ['hosting-title', 'Hosting Subscription'],
-            ['date', 'Status Date'],
-            ['status', 'Status']
+            ['specialise_title', 'Hosting Subscription'],
+            ['aggregate_reference', 'Computer'],
+            ['date', 'Status Date']
           ];
           return form_list.render({
             erp5_document: {
@@ -112,11 +113,11 @@
                   "lines": lines_limit,
                   "list_method": "portal_catalog",
                   "query": "urn:jio:allDocs?query=portal_type%3A%22" +
-                    "global" + "%22",
+                    "Software%20Instance" + "%22",
                   "portal_type": [],
                   "search_column_list": column_list,
                   "sort_column_list": column_list,
-                  "sort": [["hosting-title", "ascending"]],
+                  "sort": [["status", "ascending"]],
                   "title": "Software Instances",
                   "type": "ListBox"
                 }

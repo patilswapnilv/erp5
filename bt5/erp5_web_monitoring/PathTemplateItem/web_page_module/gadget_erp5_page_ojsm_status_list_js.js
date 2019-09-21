@@ -17,22 +17,23 @@
           var i, j, tmp, value, len = result.data.total_rows;
           for (i = 0; i < len; i += 1) {
             if (result.data.rows[i].value.hasOwnProperty("lastBuildDate")) {
-              value = new Date(result.data.rows[i].value.lastBuildDate);
               result.data.rows[i].value.lastBuildDate = {
-                allow_empty_time: 0,
-                ampm_time_style: 0,
-                css_class: "date_field",
-                date_only: 0,
-                description: "The Date",
-                editable: 0,
-                hidden: 0,
-                hidden_day_is_last_day: 0,
-                "default": value.toUTCString(),
-                key: "lastBuildDate",
-                required: 0,
-                timezone_style: 0,
-                title: "Promise Date",
-                type: "DateTimeField"
+                field_gadget_param: {
+                  //allow_empty_time: 0,
+                  //ampm_time_style: 0,
+                  css_class: "date_field",
+                  date_only: 0,
+                  description: "The Date",
+                  editable: 0,
+                  hidden: 0,
+                  hidden_day_is_last_day: 0,
+                  "default": result.data.rows[i].value.lastBuildDate,
+                  key: "lastBuildDate",
+                  required: 0,
+                  timezone_style: 1,
+                  title: "Promise Date",
+                  type: "DateTimeField"
+                }
               };
               result.data.rows[i].value["listbox_uid:list"] = {
                 key: "listbox_uid:list",
@@ -45,8 +46,8 @@
               for (j = 1; j < tmp.length; j += 1) {
                 // first line of text is the date and status
                 if (!value && tmp[j].trim() !== "") {
-                  value += tmp[j].slice(0, 30);
-                  if (tmp[j].length >= 30 || j + 1 < tmp.length) {
+                  value += tmp[j].slice(0, 50);
+                  if (tmp[j].length >= 50 || j + 1 < tmp.length) {
                     // a part of text is not shown
                     value += "...";
                   }
@@ -57,14 +58,16 @@
             if (result.data.rows[i].value.hasOwnProperty("category")) {
               value = result.data.rows[i].value.category;
               result.data.rows[i].value.category = {
-                css_class: "",
-                description: "The Status",
-                hidden: 0,
-                "default": value,
-                key: "category",
-                url: "gadget_erp5_field_status.html",
-                title: "Status",
-                type: "GadgetField"
+                field_gadget_param: {
+                  css_class: "",
+                  description: "The Status",
+                  hidden: 0,
+                  "default": value,
+                  key: "category",
+                  url: "gadget_erp5_field_status.html",
+                  title: "Status",
+                  type: "GadgetField"
+                }
               };
               result.data.rows[i].value["listbox_uid:list"] = {
                 key: "listbox_uid:list",
@@ -116,12 +119,12 @@
         })
         .push(function (form_list) {
           var column_list = [
+            ['category', 'Status'],
             ['source', 'Promise'],
             ['channel_item', 'Software Instance'],
             ['channel', 'Hosting Subscription'],
             ['lastBuildDate', 'Promise Date'],
-            ['description', 'Message'],
-            ['category', 'Status']
+            ['description', 'Message']
           ];
           return form_list.render({
             erp5_document: {

@@ -18,6 +18,7 @@
    *  "type": "replicatedopml",
    *  "remote_storage_unreachable_status": "WARNING",
    *  "remote_opml_check_time_interval": 86400000,
+   *  "request_timeout": 0,
    *  local_sub_storage: {
    *    type: "query",
    *      sub_storage: {
@@ -30,17 +31,50 @@
    */
 
   var rusha = new Rusha(),
-    OPML_ATTACHMENT_NAME = "__opml__";
+    OPML_ATTACHMENT_NAME = "__opml__",
+    ZONE_LIST = [
+      "-1200",
+      "-1100",
+      "-1000",
+      "-0900",
+      "-0800",
+      "-0700",
+      "-0600",
+      "-0500",
+      "-0400",
+      "-0300",
+      "-0200",
+      "-0100",
+      "+0000",
+      "+0100",
+      "+0200",
+      "+0300",
+      "+0400",
+      "+0500",
+      "+0600",
+      "+0700",
+      "+0800",
+      "+0900",
+      "+1000",
+      "+1100",
+      "+1200"
+    ];
 
   function generateHash(str) {
     return rusha.digestFromString(str);
   }
 
   function createStorage(context, storage_spec, key) {
-    if (!context._remote_storage_dict.hasOwnProperty(key)) {
-      context._remote_storage_dict[key] = jIO.createJIO(storage_spec);
+    var signature;
+    signature = generateHash(JSON.stringify(storage_spec));
+    if (!context._remote_storage_dict.hasOwnProperty(key) ||
+        signature !== context._remote_storage_dict[key].signature) {
+      context._remote_storage_dict[key] = {
+        storage: jIO.createJIO(storage_spec),
+        signature: signature
+      };
     }
-    return context._remote_storage_dict[key];
+    return context._remote_storage_dict[key].storage;
   }
 
   /**
@@ -72,6 +106,10 @@
     if (this._remote_opml_check_time_interval === undefined) {
       // one day in miliseconds
       this._remote_opml_check_time_interval = 86400000;
+    }
+    this._request_timeout = spec.request_timeout;
+    if (this._request_timeout === undefined) {
+      this._request_timeout = 0; // no timeout
     }
   }
 
@@ -120,13 +158,17 @@
           var remove_id_list = [],
             remove_signature_id_list = [];
 
+          // remove related hosting subscription
+          remove_id_list.push(generateHash(id));
+          // removed saved opml content
           remove_signature_id_list.push({
             id: url,
             name: url
           });
+          // remove all related documents
           return storage.allDocs({
             select_list: ["xmlUrl", "url"],
-            query: '(portal_type:"opml-outline") AND (parent_url:"' + url + '")'
+            query: '(portal_type:"Opml Outline") AND (parent_url:"' + url + '")'
           })
             .push(function (document_result) {
               var i,
@@ -243,6 +285,32 @@
       });
   }
 
+  function fixGlobalInstanceDocument(instance) {
+    // Fix some property as backed is old, to keep backward compatibility
+    // XXX - this method should be removed when all backend will be upgraded
+    if (instance._embedded !== undefined) {
+      if (instance._embedded.instance !== undefined) {
+        // set aggregate_reference to the computer reference and make it
+        // searchable
+        instance.aggregate_reference = instance._embedded.instance.computer;
+      }
+      if (instance._embedded.hasOwnProperty('promises')) {
+        // remove useless information from the document
+        delete instance._embedded.promises;
+      }
+    }
+    if (instance.hasOwnProperty('hosting-title')) {
+      // hosting-title should be specialise_title
+      instance.specialise_title = instance['hosting-title'];
+      delete instance['hosting-title'];
+    }
+    // set portal_type is not defined
+    if (!instance.hasOwnProperty('portal_type')) {
+      instance.portal_type = "Software Instance";
+    }
+    return instance;
+  }
+
   function updateSubStorageStatus(context, signature_dict, next_status) {
     var key,
       update_status_queue = new RSVP.Queue();
@@ -278,7 +346,7 @@
       });
   }
 
-  function loadSubStorage(context, storage_spec, parent_id, type) {
+  function loadSubStorage(context, storage_spec, parent_id, index, type) {
     var sub_storage,
       result_dict,
       storage_key,
@@ -293,7 +361,8 @@
       type:  type || storage_spec.type,
       current_signature: {},
       result: {data: {total_rows: 0}},
-      url: url
+      url: url,
+      parent_index: index
     };
     return sub_storage.allDocs({include_docs: true})
       .push(undefined, function (error) {
@@ -333,7 +402,33 @@
       });
   }
 
-  function getOpmlTree(context, opml_url, opml_spec, basic_login) {
+  function updateHostingSubscriptionState(hosting, element) {
+    var status = element.status.toUpperCase();
+
+    if (hosting.instance_amount === 0) {
+      hosting.status_date = fixDateTimezone(element.date);
+    }
+    if (hosting.status === "ERROR") {
+      return;
+    } else if (status === "ERROR") {
+      hosting.status = status;
+    } else if (status === "WARNING") {
+      hosting.status = status;
+    } if (status === "OK" && hosting.status !== status) {
+      hosting.status = status;
+    }
+  }
+
+  function fixDateTimezone(date_string) {
+    // set default timezone offset to UTC
+    // XXX should be removed later
+    if (ZONE_LIST.indexOf(date_string.slice(-5)) === -1) {
+      return date_string + "+0000";
+    }
+    return date_string;
+  }
+
+  function getOpmlTree(context, opml_url, opml_spec, basic_login, opml_title) {
     var opml_storage,
       opml_document_list = [],
       delete_key_list = [],
@@ -341,10 +436,21 @@
       opml_result_list,
       current_signature_dict = {},
       fetch_remote_opml = false,
+      hosting_subscription,
       id;
 
     id = generateHash(opml_url);
     opml_storage = createStorage(context, opml_spec, id);
+
+    // Hosting Subscription is build from OPML and it has status
+    hosting_subscription = {
+      title: opml_title || "",
+      portal_type: "Hosting Subscription",
+      opml_url: opml_url,
+      status: "WARNING",
+      instance_amount: 0,
+      status_date: (new Date()).toUTCString() + "+0000"
+    };
     return getDocumentAsAttachment(context, opml_url, OPML_ATTACHMENT_NAME)
       .push(function (opml_doc) {
         var current_time = new Date().getTime();
@@ -400,12 +506,18 @@
           result_list = [],
           header_dict = {};
 
-        if (opml_result_list.data.total_rows > 0 && fetch_remote_opml) {
-          header_dict = {
-            dateCreated: opml_result_list.data.rows[0].doc.dateCreated,
-            dateModified: opml_result_list.data.rows[0].doc.dateModified,
-            opml_title: opml_result_list.data.rows[0].doc.title
-          };
+        if (opml_result_list.data.total_rows > 0) {
+          if (opml_result_list.data.rows[0].doc.title) {
+            hosting_subscription.title = opml_result_list.data.rows[0]
+              .doc.title;
+          }
+          if (fetch_remote_opml) {
+            header_dict = {
+              dateCreated: opml_result_list.data.rows[0].doc.dateCreated,
+              dateModified: opml_result_list.data.rows[0].doc.dateModified,
+              opml_title: opml_result_list.data.rows[0].doc.title
+            };
+          }
         }
 
         for (i = 1; i < opml_result_list.data.total_rows; i += 1) {
@@ -420,10 +532,12 @@
                 attachment_id: 'enclosure',
                 parser: 'rss',
                 sub_storage: {
-                  type: "http"
+                  type: "http",
+                  timeout: context._request_timeout
                 }
               },
               id_hash,
+              i,
               'promise'
             ));
             // Load private docs
@@ -433,9 +547,11 @@
                 {
                   type: 'webhttp',
                   url: item.doc.url.replace('jio_private', 'private'),
-                  basic_login: basic_login
+                  basic_login: basic_login,
+                  timeout: context._request_timeout
                 },
-                id_hash
+                id_hash,
+                i
               ));
             }
 
@@ -454,7 +570,7 @@
                 delete current_signature_dict[id_hash];
               }
               Object.assign(item.doc, {
-                portal_type: "opml-outline",
+                portal_type: "Opml Outline",
                 parent_id: id,
                 parent_url: opml_url,
                 reference: id_hash,
@@ -485,15 +601,30 @@
         var i,
           j,
           start,
-          extra_dict,
-          item_signature_dict = {};
+          extra_dict;
 
-        function applyItemToTree(item, item_result, portal_type, extra_dict) {
+        function applyItemToTree(item, item_result, extra_dict) {
           var id_hash,
             element = item.doc,
             signature,
             item_id = item.guid || item.id,
-            status = (element.status || element.category);
+            status = (element.status || element.category),
+            item_signature_dict = {};
+
+          if (element.type === 'global') {
+            updateHostingSubscriptionState(hosting_subscription, element);
+            hosting_subscription.instance_amount += 1;
+            if (element.aggregate_reference === undefined) {
+              // XXX - document need to be updated to keep compatibility
+              element = fixGlobalInstanceDocument(element);
+            }
+            // XXX - fixing date timezone
+            element.date = fixDateTimezone(element.date);
+          }
+          // XXX - fixing date timezone
+          if (element.pubDate !== undefined) {
+            element.pubDate = fixDateTimezone(element.pubDate);
+          }
 
           id_hash = generateHash(item_result.parent_id +
                                  item_result.url + item_id);
@@ -509,8 +640,8 @@
           };
 
           if (item_result.current_signature.hasOwnProperty(id_hash)) {
-            if (item_result.current_signature[id_hash].signature
-                === signature) {
+            if (item_result.current_signature[id_hash].signature ===
+                signature) {
               // the document was not modified return
               delete item_result.current_signature[id_hash];
               return;
@@ -520,7 +651,8 @@
           }
           Object.assign(element, {
             parent_id: item_result.parent_id,
-            portal_type: portal_type || element.type || item_result.type,
+            portal_type: element.portal_type || element.type ||
+              item_result.type,
             status: status,
             reference: id_hash,
             active: true
@@ -528,6 +660,11 @@
           opml_document_list.push({
             id: id_hash,
             doc: element
+          });
+          attachment_document_list.push({
+            id: item_result.parent_id,
+            name: item_result.url,
+            doc: item_signature_dict
           });
         }
 
@@ -538,32 +675,20 @@
             if (result_list[i].type === "promise") {
               // the first element of rss is the header
               extra_dict = {
-                lastBuildDate: result_list[i].result.data.rows[0].doc
-                  .lastBuildDate,
+                lastBuildDate: fixDateTimezone(result_list[i].result.data.
+                  rows[0].doc.lastBuildDate),
                 channel: result_list[i].result.data.rows[0].doc.description,
                 channel_item: result_list[i].result.data.rows[0].doc.title
               };
-              applyItemToTree(
-                result_list[i].result.data.rows[0],
-                result_list[i],
-                "rss"
-              );
               start = 1;
             }
             for (j = start; j < result_list[i].result.data.total_rows; j += 1) {
               applyItemToTree(
                 result_list[i].result.data.rows[j],
                 result_list[i],
-                undefined,
                 extra_dict
               );
             }
-            attachment_document_list.push({
-              id: result_list[i].parent_id,
-              name: result_list[i].url,
-              doc: item_signature_dict
-            });
-            item_signature_dict = {};
             delete_key_list.push.apply(
               delete_key_list,
               Object.keys(result_list[i].current_signature)
@@ -578,7 +703,33 @@
               doc: result_list[i].current_signature
             });
           }
+          else if (context._remote_storage_unreachable_status !== undefined) {
+            if (result_list[i].type === "webhttp") {
+              // In case it was impossible to get software Instance
+              // Add an empty Software Instance with unreachable status
+              applyItemToTree(
+                {
+                  id: "monitor.global",
+                  doc: {
+                    portal_type: "Software Instance",
+                    status: context._remote_storage_unreachable_status,
+                    title: opml_result_list.data.rows[result_list[i]
+                      .parent_index].doc.title,
+                    date: new Date().toUTCString() + "+0000",
+                    specialise_title: opml_result_list.data.rows[result_list[i]
+                      .parent_index].doc.opml_title
+                  }
+                },
+                result_list[i],
+                undefined
+              );
+            }
+          }
         }
+        opml_document_list.push({
+          id: id,
+          doc: hosting_subscription
+        });
         return [opml_document_list, delete_key_list, attachment_document_list];
       });
   }
@@ -655,8 +806,8 @@
 
   function syncOpmlStorage(context) {
     return context._local_sub_storage.allDocs({
-      query: '(portal_type:"opml") AND (active:true)',
-      select_list: ["url", "basic_login"]
+      query: '(portal_type:"opml") AND (active:true) AND (url:"https://%")',
+      select_list: ["title", "url", "basic_login"]
     })
       .push(function (storage_result) {
         var i,
@@ -674,10 +825,12 @@
                   attachment_id: 'enclosure',
                   parser: 'opml',
                   sub_storage: {
-                    type: "http"
+                    type: "http",
+                    timeout: context._request_timeout
                   }
                 },
-                storage_spec.basic_login
+                storage_spec.basic_login,
+                storage_spec.title
               );
             })
             .push(function (result_list) {
@@ -690,11 +843,7 @@
             });
         }
         for (i = 0; i < storage_result.data.total_rows; i += 1) {
-          syncFullOpml({
-            type: storage_result.data.rows[i].value.type,
-            url: storage_result.data.rows[i].value.url,
-            basic_login: storage_result.data.rows[i].value.basic_login
-          });
+          syncFullOpml(storage_result.data.rows[i].value);
         }
         return opml_queue;
       });

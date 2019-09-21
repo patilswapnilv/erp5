@@ -108,7 +108,7 @@
         <item>
             <key> <string>text_content</string> </key>
             <value> <string>CACHE MANIFEST\n
-# generated on Fri, 15 Nov 2017 15:47:33 +0000\n
+# generated on Fri, 19 Nov 2018 12:54:57 +0000\n
 # XXX + fonts\n
 # images/ajax-loader.gif\n
 CACHE:\n
@@ -149,6 +149,8 @@ gadget_erp5_router.html\n
 gadget_erp5_router.js\n
 gadget_html5_input.html\n
 gadget_html5_input.js\n
+gadget_erp5_configure_editor.html\n
+gadget_erp5_configure_editor.js\n
 gadget_erp5_searchfield.html\n
 gadget_erp5_searchfield.js\n
 gadget_erp5_pt_form_list.html\n
@@ -205,9 +207,9 @@ gadget_erp5_page_ojsm_hosting_subscription_list.html\n
 gadget_officejs_monitoring_parameter_view.html\n
 gadget_erp5_page_settings_configurator.html\n
 gadget_erp5_page_ojsm_processes_view.html\n
-gadget_erp5_page_ojsm_hosting_subscription_view.html\n
+gadget_officejs_jio_hosting_subscription_view.html\n
 gadget_officejs_monitoring_sync.html\n
-gadget_officejs_jio_global_view.html\n
+gadget_officejs_jio_software_instance_view.html\n
 gadget_erp5_page_ojsm_software_instance_list.html\n
 gadget_officejs_monitoring_router.html\n
 gadget_officejs_jio_promise_view.html\n
@@ -223,6 +225,8 @@ gadget_erp5_page_ojsm_synchronize.html\n
 gadget_erp5_page_ojsm_erp5_configurator.html\n
 gadget_erp5_page_ojsm_jump.html\n
 gadget_officejs_monitoring_opml_edit.html\n
+gadget_erp5_page_ojsm_dispatch.html\n
+gadget_ojsm_graph_field.html\n
 \n
 # monitoring js\n
 gadget_officejs_monitoring_jio.js\n
@@ -231,13 +235,12 @@ gadget_officejs_monitoring_parameter_view.js\n
 gadget_erp5_page_settings_configurator.js\n
 gadget_erp5_page_ojsm_processes_view.js\n
 gadget_officejs_monitoring_custom.css\n
-gadget_erp5_page_ojsm_hosting_subscription_view.js\n
-gadget_global.js\n
+gadget_officejs_jio_hosting_subscription_view.js\n
 gadget_erp5_global.js\n
 gadget_officejs_monitoring_sync.js\n
 gadget_erp5_page_ojsm_software_instance_list.js\n
 gadget_officejs_monitoring_panel.js\n
-gadget_officejs_jio_global_view.js\n
+gadget_officejs_jio_software_instance_view.js\n
 gadget_erp5_page_ojsm_import_export.js\n
 gadget_erp5_page_ojsm_resources_view.js\n
 gadget_officejs_jio_promise_view.js\n
@@ -250,6 +253,8 @@ gadget_erp5_page_ojsm_synchronize.js\n
 gadget_erp5_page_ojsm_jump.js\n
 gadget_erp5_page_ojsm_erp5_configurator.js\n
 gadget_officejs_monitoring_opml_edit.js\n
+gadget_erp5_page_ojsm_dispatch.js\n
+gadget_ojsm_graph_field.js\n
 \n
 # erp5_web_renderjs_ui\n
 gadget_erp5_editor_panel.html\n
@@ -384,7 +389,7 @@ NETWORK:\n
             </item>
             <item>
                 <key> <string>serial</string> </key>
-                <value> <string>963.30985.26464.16281</string> </value>
+                <value> <string>972.4099.58600.53947</string> </value>
             </item>
             <item>
                 <key> <string>state</string> </key>
@@ -402,7 +407,7 @@ NETWORK:\n
                     </tuple>
                     <state>
                       <tuple>
-                        <float>1510766013.21</float>
+                        <float>1543855489.22</float>
                         <string>UTC</string>
                       </tuple>
                     </state>

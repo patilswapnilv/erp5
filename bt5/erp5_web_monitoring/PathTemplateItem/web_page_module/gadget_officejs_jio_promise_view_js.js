@@ -113,9 +113,14 @@
               "portal_type",
               "_links",
               "_embedded",
-              "reference"
+              "reference",
+              "aggregate_reference",
+              "ipv6",
+              "ipv4",
+              "partition_id",
+              "software_release"
             ],
-            query: '(portal_type:"global") AND (parent_id:"' +
+            query: '(portal_type:"Software Instance") AND (parent_id:"' +
               options.doc.parent_id + '")'
           });
         })
@@ -129,14 +134,13 @@
         })
         .push(function (outline_doc) {
           // get opml
-          return gadget.jio_get(outline_doc.parent_url);
+          return RSVP.all([outline_doc.parent_id,
+                           gadget.jio_get(outline_doc.parent_url)]);
         })
-        .push(function (opml_document) {
-          opml_doc = opml_document;
+        .push(function (document_list) {
+          opml_doc = document_list[1];
           return gadget.getUrlFor({command: 'push_history', options: {
-            jio_key: options.doc.reference,
-            page: 'ojsm_hosting_subscription_view',
-            opml_key: opml_document.url
+            jio_key: document_list[0]
           }});
         })
         .push(function (hosting_url) {
@@ -147,6 +151,13 @@
             software_instance = {_links: {private_url: {href: ""},
                                           public_url: {href: ""}},
                                  _embedded: {instance: {}}};
+          }
+          if (software_instance._embedded !== undefined &&
+              software_instance._embedded.hasOwnProperty('instance')) {
+            software_instance.ipv6 = software_instance._embedded.instance.ipv6;
+            software_instance.ipv4 = software_instance._embedded.instance.ipv4;
+            software_instance.partition_id = software_instance._embedded.instance.partition;
+            software_instance.software_release = software_instance._embedded.instance['software-release'];
           }
           // fix URLs
           software_instance._links.private_url.href = software_instance
@@ -161,8 +172,8 @@
             promise: options.doc,
             jio_key: options.jio_key,
             status: options.doc.category,
-            status_date: new Date(options.doc.pubDate),
-            report_date: new Date(options.doc.lastBuildDate),
+            status_date: options.doc.pubDate,
+            report_date: options.doc.lastBuildDate,
             title: options.doc.source,
             promise_output: options.doc.description,
             private_url: pass_url,
@@ -171,10 +182,11 @@
             instance_title: software_instance.title,
             hosting_title: opml_doc.title,
             hosting_url: hosting_url,
-            partition_ipv6: software_instance._embedded.instance.ipv6,
-            computer_partition: software_instance._embedded.instance.partition,
-            computer_reference: software_instance._embedded.instance.computer,
-            software_release: software_instance._embedded.instance['software-release']
+            partition_ipv6: software_instance.ipv6,
+            partition_ipv4: software_instance.ipv4,
+            computer_partition: software_instance.partition_id,
+            computer_reference: software_instance.aggregate_reference,
+            software_release: software_instance.software_release
           });
         });
     })
@@ -198,6 +210,9 @@
           gadget.state.promise.source + ".history"
         )
           .push(undefined, function (error) {
+            if (error.name === "cancel") {
+              return undefined;
+            }
             return gadget.notifySubmitted({
               status: "error",
               message: "Failed to get promise history content! \n" +
@@ -210,9 +225,14 @@
           .push(function (status_history) {
             var i,
               len,
-              start,
-              //lines,
-              message;
+              start;
+
+            function addUTCTimezone(date_string) {
+              if (new RegExp(/[+-][\d]{2}\:?[\d]{2}$/).test(date_string)) {
+                return date_string;
+              }
+              return date_string + "+0000";
+            }
 
             if (status_history && status_history.hasOwnProperty('data')) {
               // the status history list is reversed ([old, ...., newest])
@@ -226,57 +246,61 @@
               //  lines = len - start;
               //}
               for (i = start; i >= 0; i -= 1) {
-                message = status_history.data[i].message.slice(0, 60);
-                if (message.length >= 60) {
-                  message += "...";
-                }
                 result.data.total_rows += 1;
                 result.data.rows.push({
                   value: {
                     status: {
-                      css_class: "",
-                      description: "The Status",
-                      hidden: 0,
-                      "default": status_history.data[i].status,
-                      key: "status",
-                      url: "gadget_erp5_field_status.html",
-                      title: "Status",
-                      type: "GadgetField"
+                      field_gadget_param: {
+                        css_class: "",
+                        description: "The Status",
+                        hidden: 0,
+                        "default": status_history.data[i].status,
+                        key: "status",
+                        url: "gadget_erp5_field_status.html",
+                        title: "Status",
+                        type: "GadgetField"
+                      }
                     },
                     start_date: {
-                      allow_empty_time: 0,
-                      ampm_time_style: 0,
-                      css_class: "date_field",
-                      date_only: 0,
-                      description: "The Date",
-                      editable: 0,
-                      hidden: 0,
-                      hidden_day_is_last_day: 0,
-                      "default": new Date(status_history.data[i]['start-date']).toUTCString(),
-                      key: "start_date",
-                      required: 0,
-                      timezone_style: 0,
-                      title: "Date",
-                      type: "DateTimeField"
+                      field_gadget_param: {
+                        allow_empty_time: 0,
+                        ampm_time_style: 0,
+                        css_class: "date_field",
+                        date_only: 0,
+                        description: "The Date",
+                        editable: 0,
+                        hidden: 0,
+                        hidden_day_is_last_day: 0,
+                        "default": addUTCTimezone(status_history.data[i].date ||
+                          status_history.data[i]['start-date']),
+                        key: "start_date",
+                        required: 0,
+                        timezone_style: 1,
+                        title: "Date",
+                        type: "DateTimeField"
+                      }
                     },
                     change_date:  {
-                      allow_empty_time: 0,
-                      ampm_time_style: 0,
-                      css_class: "date_field",
-                      date_only: 0,
-                      description: "The Date",
-                      editable: 0,
-                      hidden: 0,
-                      hidden_day_is_last_day: 0,
-                      "default": new Date(status_history.data[i]['change-time'] * 1000)
-                        .toUTCString(),
-                      key: "change_date",
-                      required: 0,
-                      timezone_style: 0,
-                      title: "Status Date",
-                      type: "DateTimeField"
+                      field_gadget_param: {
+                        allow_empty_time: 0,
+                        ampm_time_style: 0,
+                        css_class: "date_field",
+                        date_only: 0,
+                        description: "The Date",
+                        editable: 0,
+                        hidden: 0,
+                        hidden_day_is_last_day: 0,
+                        "default": addUTCTimezone(status_history.data[i]['change-date'] ||
+                          new Date(status_history.data[i]['change-time'] * 1000)
+                          .toUTCString()),
+                        key: "change_date",
+                        required: 0,
+                        timezone_style: 1,
+                        title: "Status Date",
+                        type: "DateTimeField"
+                      }
                     },
-                    message: message,
+                    message: status_history.data[i].message,
                     "listbox_uid:list": {
                       key: "listbox_uid:list",
                       value: 2713
@@ -301,10 +325,10 @@
         })
         .push(function (form_gadget) {
           var column_list = [
+              ['status', 'Status'],
               ['start_date', 'Report Date'],
-              ['change_date', 'Last Change'],
-              ['message', 'Promise Output'],
-              ['status', 'Status']
+              ['change_date', 'Status Date'],
+              ['message', 'Promise Output']
             ];
           return form_gadget.render({
             erp5_document: {
@@ -335,26 +359,26 @@
                 "your_status_date": {
                   "description": "",
                   "title": "Status Since",
-                  "default": gadget.state.status_date.toUTCString(),
+                  "default": gadget.state.status_date,
                   "css_class": "",
                   "required": 0,
                   "editable": 0,
                   "key": "status_date",
                   "hidden": 0,
-                  "timezone_style": 0,
+                  "timezone_style": 1,
                   "date_only": 0,
                   "type": "DateTimeField"
                 },
                 "your_report_date": {
                   "description": "",
                   "title": "Report Date",
-                  "default": gadget.state.report_date.toUTCString(),
+                  "default": gadget.state.report_date,
                   "css_class": "",
                   "required": 0,
                   "editable": 0,
                   "key": "report_date",
                   "hidden": 0,
-                  "timezone_style": 0,
+                  "timezone_style": 1,
                   "date_only": 0,
                   "type": "DateTimeField"
                 },
@@ -434,7 +458,7 @@
                   "title": "Software Instance",
                   "default": [gadget.state.instance_title],
                   "query": "urn:jio:allDocs?query=%28portal_type%3A%22" +
-                    "opml-outline" + "%22%29AND%28reference%3A%22" +
+                    "Opml Outline" + "%22%29AND%28reference%3A%22" +
                     gadget.state.instance_reference + "%22%29",
                   "css_class": "",
                   "required": 0,
@@ -444,6 +468,7 @@
                   "view": "view",
                   "allow_jump": true,
                   "allow_creation": false,
+                  "sort": [],
                   "relation_item_relative_url": [gadget.state.instance_reference],
                   "type": "RelationStringField"
                 },

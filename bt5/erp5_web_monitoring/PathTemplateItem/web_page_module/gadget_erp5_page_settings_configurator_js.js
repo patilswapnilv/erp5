@@ -35,14 +35,16 @@
           for (i = 0; i < len; i += 1) {
             if (result.data.rows[i].value.hasOwnProperty("active")) {
               result.data.rows[i].value.active = {
-                css_class: "",
-                description: "Is Enabled",
-                hidden: 0,
-                "default": result.data.rows[i].value.active.toString(),
-                key: "active",
-                url: "gadget_erp5_field_status.html",
-                title: "Enabled",
-                type: "GadgetField"
+                field_gadget_param: {
+                  css_class: "",
+                  description: "Is Enabled",
+                  hidden: 0,
+                  "default": result.data.rows[i].value.active.toString(),
+                  key: "active",
+                  url: "gadget_erp5_field_status.html",
+                  title: "Enabled",
+                  type: "GadgetField"
+                }
               };
               result.data.rows[i].value["listbox_uid:list"] = {
                 key: "listbox_uid:list",
@@ -60,6 +62,8 @@
 
     .onEvent('click', function (event) {
       var gadget = this,
+        sync_start_time,
+        success = true,
         element = gadget.element.querySelector("#destroyOPML");
 
       function removeAllOPML(result) {
@@ -96,23 +100,57 @@
 
         return gadget.notifySubmitting()
           .push(function () {
+            return gadget.getSetting('sync_start_time');
+          })
+          .push(function (start_time) {
+            sync_start_time = start_time;
+            return gadget.getSetting('latest_sync_time');
+          })
+          .push(function (finish_time) {
+            if (finish_time - sync_start_time < 0) {
+              // sync is running, cannot remove OPML now
+              success = false;
+              return RSVP.all([
+                gadget.notifySubmitted({
+                  message: 'Cannot destroy now, please wait until background ' +
+                    'sync is finished',
+                  status: 'error'
+                })
+              ]);
+            }
             element.setAttribute("disabled", "disabled");
             return gadget.jio_allDocs({
               query: 'portal_type: "opml"',
               select_list: ['title']
-            });
-          })
-          .push(function (result) {
-            return removeAllOPML(result);
+            })
+              .push(function (result) {
+                return RSVP.all([
+                  gadget.setSetting('sync_lock', true),
+                  removeAllOPML(result)
+                ]);
+              })
+              .push(function () {
+                return RSVP.all([
+                  gadget.setSetting('sync_lock', false),
+                  gadget.notifySubmitted({
+                    message: 'All OPML removed',
+                    status: 'success'
+                  })
+                ]);
+              }, function () {
+                success = false;
+                return gadget.setSetting('sync_lock', false);
+              });
           })
           .push(function () {
-            return RSVP.all([
-              gadget.notifySubmitted({message: 'All OPML removed', status: 'success'})
-            ]);
-          })
-          .push(function () {
-            element.textContent = element.textContent.slice(10, element.textContent.length);
-            return gadget.redirect({"command": "reload"});
+            element.textContent = element.textContent.slice(
+              10,
+              element.textContent.length
+            );
+            element.setAttribute('rel', '');
+            if (success) {
+              return gadget.redirect({"command": "reload"});
+            }
           });
       }
     }, false, false)
@@ -129,7 +167,11 @@
         .push(function (form_doc) {
           doc = form_doc;
           return gadget.setSetting('sync_check_offline',
-            doc.check_online_access === 1 ? 'true' : 'false');
+            doc.check_online_access === "on" ? 'true' : 'false');
+        })
+        .push(function () {
+          return gadget.setSetting('opml_add_auto_sync',
+                                   doc.opml_add_auto_sync || "off");
         })
         .push(function () {
           return gadget.setSetting('sync_data_interval',
@@ -159,7 +201,8 @@
         sync_data_interval,
         check_online_access,
         listbox_lines_limit,
-        opml_import_limit;
+        opml_import_limit,
+        opml_add_auto_sync;
 
       if (options.url) {
         // backward compatibility redirect to add opml
@@ -169,7 +212,7 @@
 
       return new RSVP.Queue()
         .push(function () {
-          return gadget.getSetting('opml_import_limit', 100);
+          return gadget.getSetting('opml_import_limit', 300);
         })
         .push(function (import_limit) {
           opml_import_limit = import_limit;
@@ -185,14 +228,18 @@
         })
         .push(function (latest_sync_time) {
           last_sync_time = latest_sync_time;
+          return gadget.getSetting("opml_add_auto_sync", "on");
+        })
+        .push(function (auto_sync) {
+          opml_add_auto_sync = auto_sync;
           return gadget.getSetting("sync_check_offline", "true");
         })
         .push(function (sync_check_offline) {
           if (sync_check_offline === "true" || sync_check_offline === true ||
               sync_check_offline === undefined) {
-            check_online_access = "true";
+            check_online_access = "on";
           } else {
-            check_online_access = "false";
+            check_online_access = "";
           }
           return RSVP.all([
             gadget.getDeclaredGadget('form_view'),
@@ -201,9 +248,10 @@
         })
         .push(function (result) {
           var column_list = [
-            ['title', 'OPML Title'],
+            ['title', 'Title'],
             ['url', 'Url'],
-            ['active', 'Enable Sync']
+            ['state', 'Requested State'],
+            ['active', 'Sync Enabled']
           ];
           return result[0].render({
             erp5_document: {
@@ -256,6 +304,16 @@
                   "hidden": 0,
                   "type": "CheckBoxField"
                 },
+                "my_opml_add_auto_sync": {
+                  "description": "When Add OPML, start sync automatically",
+                  "title": "Auto Sync Added OPML",
+                  "default": opml_add_auto_sync,
+                  "css_class": "",
+                  "editable": 1,
+                  "key": "opml_add_auto_sync",
+                  "hidden": 0,
+                  "type": "CheckBoxField"
+                },
                 "my_opml_import_limit": {
                   "description": "Maximum number of OPML to import",
                   "title": "OPML Import Limit",
@@ -297,7 +355,7 @@
                 "left",
                 [["your_last_sync_date"], ["my_auto_sync_interval"],
                  ["my_listbox_lines_limit"], ["my_opml_import_limit"],
-                 ["my_check_online_access"]]
+                 ["my_check_online_access"], ["my_opml_add_auto_sync"]]
               ],
               [
                 "right",

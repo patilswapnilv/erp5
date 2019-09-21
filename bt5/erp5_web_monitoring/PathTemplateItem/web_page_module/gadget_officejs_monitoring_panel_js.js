@@ -70,6 +70,9 @@
         view_list = JSON.stringify(view_list);
       }
       return context.getUrlParameter('editable')
+        .push(function () {
+          return context.registerSync();
+        })
         .push(function (editable) {
           return context.changeState({
             workflow_list: workflow_list,
@@ -144,7 +147,7 @@
               context.getUrlFor({command: 'display', options: {page: "ojsm_hosting_subscription_list"}}),
               context.getUrlFor({command: 'display', options: {page: "settings_configurator"}}),
               context.getUrlFor({command: 'display', options: {page: "ojsm_import_export"}}),
-              context.getUrlFor({command: 'display', options: {page: "ojsm_synchronize"}})
+              context.getUrlFor({command: 'display', options: {page: "ojsm_synchronize", reset: 1}})
             ]);
           })
           .push(function (result_list) {
@@ -270,7 +273,7 @@
       window.dispatchEvent(event);
       return result;
     })
-    .declareService(function () {
+    .declareJob('registerSync', function () {
       return this.getDeclaredGadget("sync_gadget")
         .push(function (sync_gadget) {
           return sync_gadget.register();
@@ -295,10 +298,10 @@
         })
         .push(function (data) {
           var options = {
-            page: "ojsm_status_list"
+            page: "ojsm_dispatch"
           };
           if (data.search) {
-            options.extended_search = data.search;
+            options.query = data.search;
           }
           // Remove focus from the search field
           document.activeElement.blur();

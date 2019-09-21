@@ -13,6 +13,7 @@
   </head>
 
   <body>
+    <div data-gadget-url="gadget_officejs_monitoring_sync.html" data-gadget-scope="sync_gadget" data-gadget-sandbox="public"></div>
     <form class="save_form ui-body-c" novalidate>
       <button type="submit" class="ui-btn ui-btn-b ui-btn-inline
         ui-icon-edit ui-btn-icon-right ui-screen-hidden"></button>
@@ -23,5 +24,13 @@
               data-gadget-sandbox="public">
       </div>
     </form>
+    <div class="ui-field-contain">
+      <div class="btn-nopasswd left padding-tb-20" style="display: none">
+        <button class="danger-button" id="saveOPMLNoPwd" data-i18n="Save OPML with broken password">
+          Save OPML Anyway!
+        </button>
+        <span><i data-i18n="with all associated data">Information which require password won't be displayed in monitor.</i></span>
+      </div>
+    </div>
   </body>
 </html>

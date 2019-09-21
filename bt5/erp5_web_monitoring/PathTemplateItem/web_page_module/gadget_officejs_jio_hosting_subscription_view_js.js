@@ -1,19 +1,14 @@
-/*global window, rJS, document, RSVP, Rusha, escape */
+/*global window, rJS, document, RSVP, escape */
 /*jslint nomen: true, indent: 2, maxerr: 3*/
-(function (window, rJS, document, RSVP, Rusha, escape) {
+(function (window, rJS, document, RSVP, escape) {
   "use strict";
 
-  var gadget_klass = rJS(window),
-    rusha = new Rusha();
-
-  function generateHash(str) {
-    return rusha.digestFromString(str);
-  }
+  var gadget_klass = rJS(window);
 
   gadget_klass
     .setState({
       ouline_list: "",
-      opml: ""
+      hosting_subscription: ""
     })
     .ready(function (g) {
       g.props = {};
@@ -45,22 +40,23 @@
             len = result.data.total_rows;
           for (i = 0; i < len; i += 1) {
             if (result.data.rows[i].value.hasOwnProperty("date")) {
-              value = new Date(result.data.rows[i].value.date);
               result.data.rows[i].value.date = {
-                allow_empty_time: 0,
-                ampm_time_style: 0,
-                css_class: "date_field",
-                date_only: 0,
-                description: "The Date",
-                editable: 0,
-                hidden: 0,
-                hidden_day_is_last_day: 0,
-                "default": value.toUTCString(),
-                key: "date",
-                required: 0,
-                timezone_style: 0,
-                title: "Status Date",
-                type: "DateTimeField"
+                field_gadget_param: {
+                  allow_empty_time: 0,
+                  ampm_time_style: 0,
+                  css_class: "date_field",
+                  date_only: 0,
+                  description: "The Date",
+                  editable: 0,
+                  hidden: 0,
+                  hidden_day_is_last_day: 0,
+                  "default": result.data.rows[i].value.date,
+                  key: "date",
+                  required: 0,
+                  timezone_style: 1,
+                  title: "Status Date",
+                  type: "DateTimeField"
+                }
               };
               result.data.rows[i].value["listbox_uid:list"] = {
                 key: "listbox_uid:list",
@@ -70,14 +66,16 @@
             if (result.data.rows[i].value.hasOwnProperty("status")) {
               value = result.data.rows[i].value.status;
               result.data.rows[i].value.status = {
-                css_class: "",
-                description: "The Status",
-                hidden: 0,
-                "default": value,
-                key: "status",
-                url: "gadget_erp5_field_status.html",
-                title: "Status",
-                type: "GadgetField"
+                field_gadget_param: {
+                  css_class: "",
+                  description: "The Status",
+                  hidden: 0,
+                  "default": value,
+                  key: "status",
+                  url: "gadget_erp5_field_status.html",
+                  title: "Status",
+                  type: "GadgetField"
+                }
               };
               result.data.rows[i].value["listbox_uid:list"] = {
                 key: "listbox_uid:list",
@@ -95,15 +93,21 @@
         title: 'Hosting Subscriptions View'
       })
         .push(function () {
-          return gadget.jio_get(options.opml_key);
+          return gadget.jio_get(options.jio_key);
+        })
+        .push(function (hosting_doc) {
+          return gadget.changeState({hosting_subscription: hosting_doc});
+        })
+        .push(function () {
+          return gadget.jio_get(gadget.state.hosting_subscription.opml_url);
         })
         .push(function (opml_doc) {
           return gadget.changeState({opml: opml_doc});
         })
         .push(function () {
           return gadget.jio_allDocs({
-            query: '(portal_type:"opml-outline") AND (parent_id:"' +
-              generateHash(options.opml_key) + '")'
+            query: '(portal_type:"Opml Outline") AND (parent_id:"' +
+              options.jio_key + '")'
           });
         })
         .push(function (ouline_list) {
@@ -186,6 +190,12 @@
             }
 
             for (i = 0; i < gadget.state.instance_dict.data.total_rows; i += 1) {
+              if (gadget.state.instance_dict.data.rows[i]
+                  .value.aggregate_reference === undefined) {
+                // Instance is not Synchronized!
+                promise_list.push(false);
+                continue;
+              }
               gadget_element = document.createElement("div");
               element.appendChild(gadget_element);
               promise_list.push(
@@ -201,17 +211,19 @@
           .push(function (parameter_gadget_list) {
             var i,
               promise_list = [];
+            gadget.props.parameter_form_list = parameter_gadget_list;
             for (i = 0; i < parameter_gadget_list.length; i += 1) {
-              gadget.props.parameter_form_list = parameter_gadget_list;
-              promise_list.push(
-                parameter_gadget_list[i].render({
-                  url: gadget.state.instance_dict.data.rows[i].value._links.private_url.href
-                    .replace('jio_private', 'private') + '/config',
-                  basic_login: gadget.state.opml.basic_login,
-                  title: "Parameters " + gadget.state.instance_dict.data.rows[i].value.title,
-                  parameters: gadget.state.instance_dict.data.rows[i].value.parameters
-                })
-              );
+              if (parameter_gadget_list[i]) {
+                promise_list.push(
+                  parameter_gadget_list[i].render({
+                    url: gadget.state.instance_dict.data.rows[i].value._links.private_url.href
+                      .replace('jio_private', 'private') + '/config',
+                    basic_login: gadget.state.opml.basic_login,
+                    title: "Parameters " + gadget.state.instance_dict.data.rows[i].value.title,
+                    parameters: gadget.state.instance_dict.data.rows[i].value.parameters
+                  })
+                );
+              }
             }
             return RSVP.all(promise_list);
           });
@@ -224,11 +236,12 @@
           var column_list = [
               ['title', 'Instance Title'],
               ['date', 'Status Date'],
+              ['aggregate_reference', 'Computer'],
               ['status', 'Status']
             ],
             j,
             key_list = [],
-            instance_query = '(portal_type:"global")';
+            instance_query = '(portal_type:"Software Instance")';
 
           if (gadget.state.ouline_list.length === 0) {
             return;
@@ -279,27 +292,27 @@
             gadget.getUrlFor({command: 'history_previous'}),
             gadget.getUrlFor({command: 'store_and_change', options: {
               page: "ojsm_jump",
-              jio_key: gadget.state.opml.url,
-              title: gadget.state.opml.title,
+              jio_key: gadget.state.hosting_subscription.opml_url,
+              title: gadget.state.hosting_subscription.title,
               view_title: "Related OPML",
               search_page: "ojsm_status_list"
             }})
           ]);
         })
         .push(function (url_list) {
-          if (gadget.state.ouline_list.length === 0) {
+          if (gadget.state.hosting_subscription.instance_amount === 0) {
             gadget.element.querySelector('.hosting-title').textContent =
-              gadget.state.opml.title + " -  Not synchronized!";
+              gadget.state.hosting_subscription.title + " -  Not synchronized!";
             return gadget.updateHeader({
-              page_title: "Hosting Subscription: " + gadget.state.opml.title,
+              page_title: "Hosting Subscription: " + gadget.state.hosting_subscription.title,
               selection_url: url_list[0],
               jump_url: url_list[1]
             });
           }
           gadget.element.querySelector('.hosting-title').textContent =
-            gadget.state.opml.title;
+            gadget.state.hosting_subscription.title;
           return gadget.updateHeader({
-            page_title: "Hosting Subscription: " + gadget.state.opml.title,
+            page_title: "Hosting Subscription: " + gadget.state.hosting_subscription.title,
             selection_url: url_list[0],
             jump_url: url_list[1],
             save_action: true
@@ -307,4 +320,4 @@
         });
     });
 
-}(window, rJS, document, RSVP, Rusha, escape));
+}(window, rJS, document, RSVP, escape));

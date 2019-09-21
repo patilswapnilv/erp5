@@ -111,7 +111,7 @@
         </item>
         <item>
             <key> <string>title</string> </key>
-            <value> <string>passwordGadget ERP5 Statusfield</string> </value>
+            <value> <string>Gadget ERP5 Statusfield</string> </value>
         </item>
         <item>
             <key> <string>version</string> </key>
@@ -242,7 +242,7 @@
             </item>
             <item>
                 <key> <string>serial</string> </key>
-                <value> <string>963.8986.63671.20514</string> </value>
+                <value> <string>964.25935.32773.12561</string> </value>
             </item>
             <item>
                 <key> <string>state</string> </key>
@@ -260,7 +260,7 @@
                     </tuple>
                     <state>
                       <tuple>
-                        <float>1509446386.76</float>
+                        <float>1514308778.96</float>
                         <string>UTC</string>
                       </tuple>
                     </state>
