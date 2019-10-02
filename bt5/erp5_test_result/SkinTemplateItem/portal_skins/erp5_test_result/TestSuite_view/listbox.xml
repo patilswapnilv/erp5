@@ -98,6 +98,10 @@
                           <string>branch</string>
                           <string>Branch</string>
                         </tuple>
+                        <tuple>
+                          <string>destination_title</string>
+                          <string>Gitlab Connector</string>
+                        </tuple>
                       </list>
                     </value>
                 </item>
