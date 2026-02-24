@@ -390,18 +390,20 @@ class SlapOSControler(object):
     return status_dict
 
   def prune(self, extra_software_path_list):
-    extra_args = []
-    for extra_software_path in extra_software_path_list:
-      extra_args.append('--additional-software-directory')
-      extra_args.append(extra_software_path)
-
-    self.spawn(
+    args = [
       self.config['slapos_binary'],
       'node',
       'prune',
       '--cfg', self.slapos_config,
-      *extra_args,
-      log_prefix='prune',
-      get_output=False,
-      raise_error_if_fail=False,
-  )
+    ]
+    for extra_software_path in extra_software_path_list:
+      args.append('--additional-software-directory')
+      args.append(extra_software_path)
+
+    kw = {
+      'log_prefix' : 'prune',
+      'get_output' : False,
+      'raise_error_if_fail' : False,
+    }
+
+    self.spawn(*args, **kw)
